@@ -1,42 +1,14 @@
 const { cmd } = require('../command');
-const config = require("../config");
+const config = require('../config');
 
-// Anti-Bad Words System
-cmd({
-  'on': "body"
-}, async (conn, m, store, {
-  from,
-  body,
-  isGroup,
-  isAdmins,
-  isBotAdmins,
-  reply,
-  sender
-}) => {
-  try {
-    const badWords = ["wtf", "mia", "xxx", "fuck", 'sex', "huththa", "pakaya", 'ponnaya', "hutto"];
+// Default mode (fallback)
+if (!config.ANTI_LINK_MODE) {
+  config.ANTI_LINK_MODE = "warn"; // warn | delete | kick
+}
 
-    if (!isGroup || isAdmins || !isBotAdmins) {
-      return;
-    }
-
-    const messageText = body.toLowerCase();
-    const containsBadWord = badWords.some(word => messageText.includes(word));
-
-    if (containsBadWord && config.ANTI_BAD_WORD === 'true') {
-      await conn.sendMessage(from, { 'delete': m.key }, { 'quoted': m });
-      await conn.sendMessage(from, { 'text': "🚫 ⚠️ BAD WORDS NOT ALLOWED ⚠️ 🚫" }, { 'quoted': m });
-    }
-  } catch (error) {
-    console.error(error);
-    reply("An error occurred while processing the message.");
-  }
-});
-
-// Anti-Link System
+// All link patterns
 const linkPatterns = [
-  /https?:\/\/(?:chat\.whatsapp\.com|wa\.me)\/\S+/gi,
-  /^https?:\/\/(www\.)?whatsapp\.com\/channel\/([a-zA-Z0-9_-]+)$/,
+  /https?:\/\/chat\.whatsapp\.com\/\S+/gi,
   /wa\.me\/\S+/gi,
   /https?:\/\/(?:t\.me|telegram\.me)\/\S+/gi,
   /https?:\/\/(?:www\.)?youtube\.com\/\S+/gi,
@@ -50,16 +22,59 @@ const linkPatterns = [
   /https?:\/\/(?:www\.)?snapchat\.com\/\S+/gi,
   /https?:\/\/(?:www\.)?pinterest\.com\/\S+/gi,
   /https?:\/\/(?:www\.)?reddit\.com\/\S+/gi,
-  /https?:\/\/ngl\/\S+/gi,
-  /https?:\/\/(?:www\.)?discord\.com\/\S+/gi,
-  /https?:\/\/(?:www\.)?twitch\.tv\/\S+/gi,
-  /https?:\/\/(?:www\.)?vimeo\.com\/\S+/gi,
-  /https?:\/\/(?:www\.)?dailymotion\.com\/\S+/gi,
-  /https?:\/\/(?:www\.)?medium\.com\/\S+/gi
+  /https?:\/\/(?:www\.)?discord\.com\/\S+/gi
 ];
 
+// ================= MENU COMMAND =================
+
 cmd({
-  'on': "body"
+  pattern: "antilink",
+  desc: "Configure anti-link settings",
+  type: "group"
+}, async (conn, m, store, {
+  from,
+  args,
+  isGroup,
+  isAdmins,
+  reply
+}) => {
+
+  if (!isGroup) return reply("❌ This command works in groups only.");
+  if (!isAdmins) return reply("❌ Only group admins can use this command.");
+
+  const option = args[0]?.toLowerCase();
+
+  if (!option) {
+    return reply(
+`🛡️ *ANTI-LINK SETTINGS*
+
+Choose what action the bot should take:
+
+1️⃣ Warn
+2️⃣ Delete message
+3️⃣ Kick user
+
+📌 Commands:
+.antilink warn
+.antilink delete
+.antilink kick
+
+⚙️ Current Mode: *${config.ANTI_LINK_MODE.toUpperCase()}*`
+    );
+  }
+
+  if (!["warn", "delete", "kick"].includes(option)) {
+    return reply("❌ Invalid option.\nUse: warn | delete | kick");
+  }
+
+  config.ANTI_LINK_MODE = option;
+  reply(`✅ Anti-Link mode set to *${option.toUpperCase()}*`);
+});
+
+// ================= CORE LOGIC =================
+
+cmd({
+  on: "body"
 }, async (conn, m, store, {
   from,
   body,
@@ -69,24 +84,47 @@ cmd({
   isBotAdmins,
   reply
 }) => {
+
   try {
-    if (!isGroup || isAdmins || !isBotAdmins) {
-      return;
+    if (!isGroup || isAdmins || !isBotAdmins) return;
+    if (config.ANTI_LINK !== "true") return;
+
+    const containsLink = linkPatterns.some(p => p.test(body));
+    if (!containsLink) return;
+
+    const mode = config.ANTI_LINK_MODE;
+    const user = sender.split("@")[0];
+
+    // 🟡 WARN
+    if (mode === "warn") {
+      return await conn.sendMessage(from, {
+        text: `⚠️ Warning @${user}\nLinks are not allowed in this group.`,
+        mentions: [sender]
+      }, { quoted: m });
     }
 
-    const containsLink = linkPatterns.some(pattern => pattern.test(body));
+    // 🟠 DELETE
+    if (mode === "delete") {
+      await conn.sendMessage(from, { delete: m.key });
+      return await conn.sendMessage(from, {
+        text: `🗑️ Message deleted.\nLinks are not allowed here.`,
+      }, { quoted: m });
+    }
 
-    if (containsLink && config.ANTI_LINK === 'true') {
-      await conn.sendMessage(from, { 'delete': m.key }, { 'quoted': m });
+    // 🔴 KICK
+    if (mode === "kick") {
+      await conn.sendMessage(from, { delete: m.key });
+
       await conn.sendMessage(from, {
-        'text': `⚠️ Links are not allowed in this group.\n@${sender.split('@')[0]} has been removed. 🚫`,
-        'mentions': [sender]
-      }, { 'quoted': m });
+        text: `🚪 @${user} removed.\nReason: Sending links.`,
+        mentions: [sender]
+      }, { quoted: m });
 
-      await conn.groupParticipantsUpdate(from, [sender], "remove");
+      return await conn.groupParticipantsUpdate(from, [sender], "remove");
     }
-  } catch (error) {
-    console.error(error);
-    reply("An error occurred while processing the message.");
+
+  } catch (e) {
+    console.error(e);
+    reply("⚠️ Error while processing Anti-Link.");
   }
 });
