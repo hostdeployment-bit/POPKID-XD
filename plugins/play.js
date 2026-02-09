@@ -3,7 +3,7 @@ const axios = require('axios');
 const { cmd } = require('../command');
 
 cmd({
-  pattern: 'play2',
+  pattern: 'play',
   desc: 'Search & play YouTube audio',
   category: 'downloader',
   filename: __filename
