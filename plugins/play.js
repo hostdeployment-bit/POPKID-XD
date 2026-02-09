@@ -1,67 +1,111 @@
 const { cmd } = require('../command');
 const axios = require('axios');
 
+// helper to get buffer
+async function getBuffer(url) {
+    const res = await axios.get(url, { responseType: 'arraybuffer' });
+    return res.data;
+}
+
 cmd({
-    pattern: "play",
-    desc: "Download music from Spotify by link or name",
-    category: "main",
+    pattern: "popkidplay",
+    desc: "Download song from YouTube",
+    category: "downloader",
     filename: __filename
-}, async (conn, m, mek, { from, args, reply }) => {
+}, async (conn, m, mek, { from, q, reply }) => {
+    if (!q) return reply("❌ Please provide a song name or YouTube link");
+
     try {
-        if (!args[0]) {
-            return reply("❌ Give me a song name or Spotify link!\n\nExample:\n.play 2pac intro\n.play https://open.spotify.com/track/xxxx");
+        await conn.sendMessage(from, { react: { text: "🎶", key: mek.key } });
+
+        // 🔎 Use deline API for searching
+        let apiSearch;
+        if (/^https?:\/\//.test(q)) {
+            // User provided a link
+            apiSearch = `https://api.deline.web.id/downloader/ytplay?q=${encodeURIComponent(q)}`;
+        } else {
+            // User provided a name
+            apiSearch = `https://api.deline.web.id/downloader/ytplay?q=${encodeURIComponent(q)}`;
         }
 
-        const query = args.join(" ");
-        const start = Date.now();
+        const searchRes = await axios.get(apiSearch);
+        if (!searchRes.data || !searchRes.data.status || !searchRes.data.result) {
+            return reply("❌ No results found");
+        }
 
-        await conn.sendMessage(from, { react: { text: "🎧", key: mek.key } });
+        const video = searchRes.data.result;
 
-        let spotifyUrl = query;
+        // Use deline API to get mp3/audio
+        const apiAudio = `https://api.deline.web.id/downloader/ytmp3?url=${encodeURIComponent(video.url)}`;
+        const audioBuffer = await getBuffer(apiAudio);
 
-        // If it's NOT a Spotify link, search first
-        if (!query.includes("open.spotify.com")) {
-            const searchUrl = `https://api.yupra.my.id/api/search/spotify?q=${encodeURIComponent(query)}`;
-            const searchRes = await axios.get(searchUrl);
+        const timeTag = Date.now();
 
-            if (!searchRes.data.status || !searchRes.data.result || searchRes.data.result.length === 0) {
-                return reply("❌ No results found for that song.");
+        const buttons = [
+            { buttonId: `aud1_${timeTag}`, buttonText: { displayText: "Audio 🎶" }, type: 1 },
+            { buttonId: `aud2_${timeTag}`, buttonText: { displayText: "Voice 🔉" }, type: 1 },
+            { buttonId: `aud3_${timeTag}`, buttonText: { displayText: "Document 📄" }, type: 1 }
+        ];
+
+        const buttonMessage = {
+            image: { url: video.thumbnail },
+            caption: `🎵 *${video.title}*\n⏱ ${video.duration || "Unknown"}\n\nSelect download format:`,
+            footer: "POPKID MD",
+            buttons: buttons,
+            headerType: 4
+        };
+
+        const sentMsg = await conn.sendMessage(from, buttonMessage, { quoted: mek });
+
+        // Button handler
+        conn.ev.on("messages.upsert", async (update) => {
+            try {
+                const msg = update.messages[0];
+                if (!msg.message) return;
+
+                const btn = msg.message.buttonsResponseMessage;
+                if (!btn) return;
+
+                if (msg.key.remoteJid !== from) return;
+
+                const id = btn.selectedButtonId;
+                if (!id.endsWith(`_${timeTag}`)) return;
+
+                await conn.sendMessage(from, { react: { text: "⬇️", key: msg.key } });
+
+                if (id.startsWith("aud1")) {
+                    // Audio
+                    await conn.sendMessage(from, {
+                        audio: audioBuffer,
+                        mimetype: "audio/mpeg"
+                    }, { quoted: msg });
+
+                } else if (id.startsWith("aud2")) {
+                    // Voice note
+                    await conn.sendMessage(from, {
+                        audio: audioBuffer,
+                        mimetype: "audio/ogg; codecs=opus",
+                        ptt: true
+                    }, { quoted: msg });
+
+                } else if (id.startsWith("aud3")) {
+                    // Document
+                    await conn.sendMessage(from, {
+                        document: audioBuffer,
+                        mimetype: "audio/mpeg",
+                        fileName: `${video.title}.mp3`.replace(/[^\w\s.-]/gi, "")
+                    }, { quoted: msg });
+                }
+
+                await conn.sendMessage(from, { react: { text: "✅", key: msg.key } });
+
+            } catch (e) {
+                console.error(e);
             }
+        });
 
-            // Take first result
-            spotifyUrl = searchRes.data.result[0].url;
-        }
-
-        // Now download using the Spotify downloader API
-        const apiUrl = `https://api.yupra.my.id/api/downloader/spotify?url=${encodeURIComponent(spotifyUrl)}`;
-        const { data } = await axios.get(apiUrl);
-
-        if (!data.status || !data.result || !data.result.download || !data.result.download.url) {
-            return reply("❌ Failed to get the song. Try another query.");
-        }
-
-        const song = data.result;
-        const audioUrl = song.download.url;
-
-        const end = Date.now();
-        const speed = end - start;
-
-        await reply(
-            `🎵 *Spotify Downloader*\n\n` +
-            `📌 *Title:* ${song.title}\n` +
-            `👤 *Artist:* ${song.artist}\n` +
-            `⚡ *Speed:* ${speed} ms\n\n` +
-            `⬇️ Sending audio...`
-        );
-
-        await conn.sendMessage(from, {
-            audio: { url: audioUrl },
-            mimetype: "audio/mpeg",
-            ptt: false
-        }, { quoted: mek });
-
-    } catch (err) {
-        console.error(err);
-        reply("❌ Error while processing your request.");
+    } catch (e) {
+        console.error(e);
+        reply("❌ Failed to download song.");
     }
 });
