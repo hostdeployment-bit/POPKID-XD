@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 const yts = require('yt-search');
 
 cmd({
-    pattern: "play",
+    pattern: "play2",
     desc: "Download YouTube song (mp3)",
     category: "music",
     react: "🎵",
