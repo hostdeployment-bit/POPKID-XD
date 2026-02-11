@@ -3,50 +3,60 @@ const fetch = require('node-fetch');
 
 cmd({
     pattern: "app",
-    desc: "Search app on HappyMod / F-Droid and send APK",
-    category: "search",
+    desc: "Search app from PlayStore and send APK",
+    category: "download",
     react: "📱",
     filename: __filename
 }, async (conn, m, mek, { from, reply }) => {
 
-    const start = Date.now();
     const query = m.text.split(" ").slice(1).join(" ").trim();
+    if (!query) return reply("❗ Enter app name");
 
-    if (!query) return reply("❗ Send an app name to search");
-
-    // ping-style reaction
     await conn.sendMessage(from, { react: { text: "🔎", key: mek.key } });
 
     try {
-        // Gifted HappyMod API
-        const api = `https://api.giftedtech.co.ke/api/search/happymod?apikey=gifted&query=${encodeURIComponent(query)}`;
-        const res = await fetch(api);
-        const json = await res.json();
 
-        if (!json.success || !json.results || !json.results.data || !json.results.data.length) {
+        // STEP 1 — Search PlayStore (accurate app name)
+        const psUrl = `https://api.giftedtech.co.ke/api/search/playstore?apikey=gifted&query=${encodeURIComponent(query)}`;
+        const psRes = await fetch(psUrl);
+        const psJson = await psRes.json();
+
+        if (!psJson.success || !psJson.results.length) {
             return reply("❌ No apps found");
         }
 
-        // Take first app result
-        const app = json.results.data[0];
+        const app = psJson.results[0];
 
-        if (!app.url) return reply("❌ APK download not available for this app");
+        // STEP 2 — Search HappyMod / F-Droid for APK
+        const apkUrl = `https://api.giftedtech.co.ke/api/search/happymod?apikey=gifted&query=${encodeURIComponent(app.name)}`;
+        const apkRes = await fetch(apkUrl);
+        const apkJson = await apkRes.json();
 
-        // fetch APK buffer
-        const apkBuffer = await fetch(app.url).then(r => r.buffer());
+        if (!apkJson.success || !apkJson.results.data.length) {
+            return reply("❌ APK not available");
+        }
 
-        const speed = Date.now() - start;
+        const apk = apkJson.results.data[0];
 
-        // send APK as document
+        if (!apk.url) return reply("❌ Download link missing");
+
+        // STEP 3 — Download APK buffer
+        const buffer = await fetch(apk.url).then(res => res.buffer());
+
+        // STEP 4 — Send as document
         await conn.sendMessage(from, {
-            document: apkBuffer,
+            document: buffer,
             fileName: `${app.name}.apk`,
             mimetype: "application/vnd.android.package-archive",
-            caption: `📱 *${app.name}*\n📝 ${app.summary}\n📦 Source: ${app.source}\n⚡ Speed: ${speed}ms`
+            caption:
+`📱 ${app.name}
+👨‍💻 ${app.developer}
+⭐ ${app.rating}
+📝 ${app.summary}`
         });
 
     } catch (err) {
-        console.error(err);
-        reply("❗ Error while fetching app");
+        console.log(err);
+        reply("❗ Error fetching app");
     }
 });
