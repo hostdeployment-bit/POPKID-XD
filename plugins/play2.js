@@ -1,9 +1,10 @@
 const { cmd } = require('../command');
 const fetch = require('node-fetch');
+const yts = require('yt-search');
 
 cmd({
-    pattern: "play2",
-    desc: "Download song from YouTube",
+    pattern: "play",
+    desc: "Download YouTube song (mp3)",
     category: "music",
     react: "🎵",
     filename: __filename
@@ -12,47 +13,49 @@ cmd({
     const start = Date.now();
     const query = m.text.split(" ").slice(1).join(" ");
 
-    if (!query) return reply("❗ Give a song name or YouTube link");
+    if (!query) return reply("❗ Send a song name or YouTube link");
 
     await conn.sendMessage(from, { react: { text: "📡", key: mek.key } });
 
     try {
-
         let videoUrl = query;
+        let title = "";
+        let thumbnail = "";
 
-        // 🎯 If user sends name → search YouTube
+        // 🔍 If not link → search YouTube
         if (!query.startsWith("http")) {
-            const searchApi = `https://api.giftedtech.co.ke/api/search/ytsearch?apikey=gifted&query=${encodeURIComponent(query)}`;
-            const res = await fetch(searchApi);
-            const data = await res.json();
+            const search = await yts(query);
+            if (!search.videos.length) return reply("❌ Song not found");
 
-            if (!data.result || data.result.length === 0) {
-                return reply("❌ Song not found");
-            }
-
-            videoUrl = data.result[0].url;
+            const video = search.videos[0];
+            videoUrl = video.url;
+            title = video.title;
+            thumbnail = video.thumbnail;
         }
 
-        // 🎵 Get MP3
+        // 🎵 Gifted MP3 API
         const apiUrl = `https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=${encodeURIComponent(videoUrl)}`;
         const response = await fetch(apiUrl);
         const json = await response.json();
 
-        if (!json.result) {
+        if (!json.success || !json.result) {
             return reply("❌ Failed to download audio");
         }
 
         const speed = Date.now() - start;
 
         await conn.sendMessage(from, {
-            audio: { url: json.result },
+            image: { url: thumbnail || json.result.thumbnail },
+            caption: `🎧 *${title || json.result.title}*\n⚡ Speed: ${speed}ms`
+        });
+
+        await conn.sendMessage(from, {
+            audio: { url: json.result.download_url },
             mimetype: "audio/mpeg"
         });
 
-        return reply(`🎧 Downloaded successfully\n⚡ Speed: ${speed}ms`);
-
     } catch (err) {
         console.error(err);
-        reply("❗ Error while processing request");
+        reply("❗ Error while downloading audio");
     }
 });
