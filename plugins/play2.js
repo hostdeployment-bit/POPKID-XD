@@ -2,7 +2,7 @@ const { cmd } = require('../command');
 const fetch = require('node-fetch');
 
 cmd({
-    pattern: "play",
+    pattern: "play2",
     desc: "Download & send YouTube audio (mp3)",
     category: "music",
     filename: __filename
