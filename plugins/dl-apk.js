@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 
 cmd({
     pattern: "app",
-    desc: "Search and send app APK",
+    desc: "Search app on HappyMod / F-Droid and send APK",
     category: "search",
     react: "📱",
     filename: __filename
@@ -18,32 +18,31 @@ cmd({
     await conn.sendMessage(from, { react: { text: "🔎", key: mek.key } });
 
     try {
-        // Gifted Play Store API
-        const api = `https://api.giftedtech.co.ke/api/search/playstore?apikey=gifted&query=${encodeURIComponent(query)}`;
+        // Gifted HappyMod API
+        const api = `https://api.giftedtech.co.ke/api/search/happymod?apikey=gifted&query=${encodeURIComponent(query)}`;
         const res = await fetch(api);
         const json = await res.json();
 
-        if (!json.success || !json.result || !json.result.length) {
+        if (!json.success || !json.results || !json.results.data || !json.results.data.length) {
             return reply("❌ No apps found");
         }
 
         // Take first app result
-        const app = json.result[0];
-        const downloadUrl = app.download_url; // Gifted provides this
+        const app = json.results.data[0];
 
-        if (!downloadUrl) return reply("❌ Download link not available for this app");
+        if (!app.url) return reply("❌ APK download not available for this app");
 
-        // fetch APK into buffer
-        const apkBuffer = await fetch(downloadUrl).then(r => r.buffer());
+        // fetch APK buffer
+        const apkBuffer = await fetch(app.url).then(r => r.buffer());
 
         const speed = Date.now() - start;
 
-        // send as document
+        // send APK as document
         await conn.sendMessage(from, {
             document: apkBuffer,
-            fileName: `${app.title}.apk`,
+            fileName: `${app.name}.apk`,
             mimetype: "application/vnd.android.package-archive",
-            caption: `📱 *${app.title}*\n👤 Developer: ${app.developer}\n⚡ Speed: ${speed}ms`
+            caption: `📱 *${app.name}*\n📝 ${app.summary}\n📦 Source: ${app.source}\n⚡ Speed: ${speed}ms`
         });
 
     } catch (err) {
