@@ -7,8 +7,6 @@ const { cmd, commands } = require('../command');
 const MENU_IMAGE_URL = "https://files.catbox.moe/7t824v.jpg";
 
 // Helpers
-const monospace = (text) => `\`${text}\``;
-
 const formatSize = (bytes) => {
     if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + 'GB';
     return (bytes / 1048576).toFixed(1) + 'MB';
@@ -53,29 +51,29 @@ cmd({
         });
 
         // Build Menu
-        let menu = `╭══〘 *${monospace(config.BOT_NAME || 'POP KID-MD')}* 〙══⊷
-┃❍ *Mode:* ${monospace(mode)}
-┃❍ *User:* ${monospace(userName)}
-┃❍ *Plugins:* ${monospace(totalCommands)}
-┃❍ *Uptime:* ${monospace(uptime)}
-┃❍ *Date:* ${monospace(date)}
-┃❍ *RAM:* ${monospace(ram)}
-┃❍ *Ping:* ${monospace(Math.floor(Math.random() * 50) + 10 + 'ms')}
+        let menu = `╭══〘 *${config.BOT_NAME || 'POP KID-MD'}* 〙══⊷
+┃❍ *Mode:* ${mode}
+┃❍ *User:* ${userName}
+┃❍ *Plugins:* ${totalCommands}
+┃❍ *Uptime:* ${uptime}
+┃❍ *Date:* ${date}
+┃❍ *RAM:* ${ram}
+┃❍ *Ping:* ${Math.floor(Math.random() * 50) + 10}ms
 ╰═════════════════⊷
 
 *Command List ⤵*`;
 
         for (const category in commandsByCategory) {
-            menu += `\n\n╭━━━━❮ *${monospace(category)}* ❯━⊷\n`;
+            menu += `\n\n╭━━━━❮ *${category}* ❯━⊷\n`;
             commandsByCategory[category].sort().forEach(cmdName => {
-                menu += `┃✞︎ ${monospace(config.PREFIX + cmdName)}\n`;
+                menu += `┃✞︎ ${config.PREFIX + cmdName}\n`;
             });
             menu += `╰━━━━━━━━━━━━━━━━━⊷`;
         }
 
         menu += `\n\n> *${config.BOT_NAME || 'POP KID-MD'}* © 2026 🇰🇪`;
 
-        // ✅ CLEAN SEND (NO externalAdReply, NO preview)
+        // ✅ Clean Send
         await conn.sendMessage(from, {
             image: { url: MENU_IMAGE_URL },
             caption: menu,
