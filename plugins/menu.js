@@ -3,88 +3,102 @@ const os = require('os');
 const moment = require('moment-timezone');
 const { cmd, commands } = require('../command');
 
-// ✅ Your Live Image URL
+// 🔥 Your Hosted Menu Image
 const MENU_IMAGE_URL = "https://files.catbox.moe/7t824v.jpg";
 
-// Helpers
-const monospace = (text) => `\`${text}\``;
-
+// ===== Helpers =====
 const formatSize = (bytes) => {
     if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + 'GB';
     return (bytes / 1048576).toFixed(1) + 'MB';
 };
 
 const formatUptime = (seconds) => {
-    const d = Math.floor(seconds / (24 * 3600));
-    const h = Math.floor((seconds % (24 * 3600)) / 3600);
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
     return `${d}d ${h}h ${m}m ${s}s`;
 };
 
+// ===== MENU COMMAND =====
 cmd({
     pattern: 'menu',
     alias: ['help', 'allmenu'],
-    react: '✅',
+    react: '⚡',
     category: 'main',
     filename: __filename,
-    desc: 'Show optimized main menu'
+    desc: 'Show Advanced Main Menu'
 }, async (conn, mek, m, { from, sender, pushName, reply }) => {
+
     try {
 
         const timeZone = 'Africa/Nairobi';
         const date = moment.tz(timeZone).format('DD/MM/YYYY');
+        const time = moment.tz(timeZone).format('HH:mm:ss');
         const uptime = formatUptime(process.uptime());
-        const ram = `${formatSize(os.totalmem() - os.freemem())}/${formatSize(os.totalmem())}`;
-        const mode = (config.MODE === 'public') ? 'PUBLIC' : 'PRIVATE';
+        const ramUsage = `${formatSize(os.totalmem() - os.freemem())}/${formatSize(os.totalmem())}`;
+        const mode = config.MODE === 'public' ? 'PUBLIC' : 'PRIVATE';
         const userName = pushName || 'User';
+        const ping = Math.floor(Math.random() * 40) + 10;
 
-        // Group Commands
+        // ===== Group Commands =====
         const commandsByCategory = {};
         let totalCommands = 0;
 
-        commands.forEach(command => {
-            if (command.pattern && !command.dontAdd && command.category) {
-                const cat = command.category.toUpperCase();
-                if (!commandsByCategory[cat]) commandsByCategory[cat] = [];
-                commandsByCategory[cat].push(command.pattern.split('|')[0]);
+        commands.forEach(cmd => {
+            if (cmd.pattern && !cmd.dontAdd && cmd.category) {
+                const category = cmd.category.toUpperCase();
+                if (!commandsByCategory[category]) {
+                    commandsByCategory[category] = [];
+                }
+                commandsByCategory[category].push(cmd.pattern.split('|')[0]);
                 totalCommands++;
             }
         });
 
-        // Build Menu
-        let menu = `╭══〘 *${monospace(config.BOT_NAME || 'POP KID-MD')}* 〙══⊷
-┃❍ *Mode:* ${monospace(mode)}
-┃❍ *User:* ${monospace(userName)}
-┃❍ *Plugins:* ${monospace(totalCommands)}
-┃❍ *Uptime:* ${monospace(uptime)}
-┃❍ *Date:* ${monospace(date)}
-┃❍ *RAM:* ${monospace(ram)}
-┃❍ *Ping:* ${monospace(Math.floor(Math.random() * 50) + 10 + 'ms')}
-╰═════════════════⊷
+        // ===== Sort Categories Alphabetically =====
+        const sortedCategories = Object.keys(commandsByCategory).sort();
 
-*Command List ⤵*`;
+        // ===== Build Menu =====
+        let menu = `
+╭━━━〔 ${config.BOT_NAME || 'POP KID-MD'} 〕━━━⊷
+┃ 👤 User: ${userName}
+┃ ⚙ Mode: ${mode}
+┃ 📦 Plugins: ${totalCommands}
+┃ ⏳ Uptime: ${uptime}
+┃ 📅 Date: ${date}
+┃ 🕒 Time: ${time}
+┃ 💾 RAM: ${ramUsage}
+┃ 🚀 Ping: ${ping}ms
+╰━━━━━━━━━━━━━━━━⊷
 
-        for (const category in commandsByCategory) {
-            menu += `\n\n╭━━━━❮ *${monospace(category)}* ❯━⊷\n`;
-            commandsByCategory[category].sort().forEach(cmdName => {
-                menu += `┃✞︎ ${monospace(config.PREFIX + cmdName)}\n`;
-            });
-            menu += `╰━━━━━━━━━━━━━━━━━⊷`;
-        }
+📜 *COMMAND LIST* ↓`;
 
-        menu += `\n\n> *${config.BOT_NAME || 'POP KID-MD'}* © 2026 🇰🇪`;
+        sortedCategories.forEach(category => {
+            menu += `\n\n╭─〔 ${category} 〕─⊷\n`;
 
-        // ✅ Send Using URL
+            commandsByCategory[category]
+                .sort()
+                .forEach(commandName => {
+                    menu += `│ ➤ ${config.PREFIX}${commandName}\n`;
+                });
+
+            menu += `╰──────────────⊷`;
+        });
+
+        menu += `\n\n© ${new Date().getFullYear()} ${config.BOT_NAME || 'POP KID-MD'} 🇰🇪`;
+
+        // ===== Send Message =====
         await conn.sendMessage(from, {
             image: { url: MENU_IMAGE_URL },
             caption: menu,
             contextInfo: {
                 mentionedJid: [sender],
-                forwardingScore: 1,
+                forwardingScore: 999,
+                isForwarded: true,
                 externalAdReply: {
-                    title: 'POP KID-MD V2 ADVANCED',
-                    body: 'POPKID TECH',
+                    title: `${config.BOT_NAME || 'POP KID-MD'} V2 ADVANCED`,
+                    body: 'POPKID TECH • Ultra Performance',
                     thumbnailUrl: MENU_IMAGE_URL,
                     sourceUrl: 'https://whatsapp.com/channel/0029VacgxK96hENmSRMRxx1r',
                     mediaType: 1,
@@ -93,8 +107,8 @@ cmd({
             }
         }, { quoted: mek });
 
-    } catch (e) {
-        console.error(e);
+    } catch (err) {
+        console.error(err);
         reply('❌ Menu processing error.');
     }
 });
