@@ -3,7 +3,7 @@ const os = require('os');
 const moment = require('moment-timezone');
 const { cmd, commands } = require('../command');
 
-// 🔥 Your Hosted Menu Image
+// 🔥 Your Hosted Image
 const MENU_IMAGE_URL = "https://files.catbox.moe/7t824v.jpg";
 
 // ===== Helpers =====
@@ -20,14 +20,13 @@ const formatUptime = (seconds) => {
     return `${d}d ${h}h ${m}m ${s}s`;
 };
 
-// ===== MENU COMMAND =====
 cmd({
     pattern: 'menu',
     alias: ['help', 'allmenu'],
     react: '⚡',
     category: 'main',
     filename: __filename,
-    desc: 'Show Advanced Main Menu'
+    desc: 'Show Ultra Premium Main Menu'
 }, async (conn, mek, m, { from, sender, pushName, reply }) => {
 
     try {
@@ -36,7 +35,7 @@ cmd({
         const date = moment.tz(timeZone).format('DD/MM/YYYY');
         const time = moment.tz(timeZone).format('HH:mm:ss');
         const uptime = formatUptime(process.uptime());
-        const ramUsage = `${formatSize(os.totalmem() - os.freemem())}/${formatSize(os.totalmem())}`;
+        const ram = `${formatSize(os.totalmem() - os.freemem())}/${formatSize(os.totalmem())}`;
         const mode = config.MODE === 'public' ? 'PUBLIC' : 'PRIVATE';
         const userName = pushName || 'User';
         const ping = Math.floor(Math.random() * 40) + 10;
@@ -47,19 +46,16 @@ cmd({
 
         commands.forEach(cmd => {
             if (cmd.pattern && !cmd.dontAdd && cmd.category) {
-                const category = cmd.category.toUpperCase();
-                if (!commandsByCategory[category]) {
-                    commandsByCategory[category] = [];
-                }
-                commandsByCategory[category].push(cmd.pattern.split('|')[0]);
+                const cat = cmd.category.toUpperCase();
+                if (!commandsByCategory[cat]) commandsByCategory[cat] = [];
+                commandsByCategory[cat].push(cmd.pattern.split('|')[0]);
                 totalCommands++;
             }
         });
 
-        // ===== Sort Categories Alphabetically =====
         const sortedCategories = Object.keys(commandsByCategory).sort();
 
-        // ===== Build Menu =====
+        // ===== Build Caption =====
         let menu = `
 ╭━━━〔 ${config.BOT_NAME || 'POP KID-MD'} 〕━━━⊷
 ┃ 👤 User: ${userName}
@@ -68,43 +64,38 @@ cmd({
 ┃ ⏳ Uptime: ${uptime}
 ┃ 📅 Date: ${date}
 ┃ 🕒 Time: ${time}
-┃ 💾 RAM: ${ramUsage}
+┃ 💾 RAM: ${ram}
 ┃ 🚀 Ping: ${ping}ms
 ╰━━━━━━━━━━━━━━━━⊷
 
-📜 *COMMAND LIST* ↓`;
+📂 Click *OPEN MENU* below to view commands`;
 
-        sortedCategories.forEach(category => {
-            menu += `\n\n╭─〔 ${category} 〕─⊷\n`;
-
-            commandsByCategory[category]
+        // ===== Build Sections =====
+        const sections = sortedCategories.map(category => ({
+            title: `${category} COMMANDS`,
+            rows: commandsByCategory[category]
                 .sort()
-                .forEach(commandName => {
-                    menu += `│ ➤ ${config.PREFIX}${commandName}\n`;
-                });
+                .map(cmdName => ({
+                    title: `${config.PREFIX}${cmdName}`,
+                    description: `Execute ${cmdName} command`,
+                    rowId: `${config.PREFIX}${cmdName}`
+                }))
+        }));
 
-            menu += `╰──────────────⊷`;
-        });
-
-        menu += `\n\n© ${new Date().getFullYear()} ${config.BOT_NAME || 'POP KID-MD'} 🇰🇪`;
-
-        // ===== Send Message =====
+        // ===== Send Image + Caption =====
         await conn.sendMessage(from, {
             image: { url: MENU_IMAGE_URL },
             caption: menu,
-            contextInfo: {
-                mentionedJid: [sender],
-                forwardingScore: 999,
-                isForwarded: true,
-                externalAdReply: {
-                    title: `${config.BOT_NAME || 'POP KID-MD'} V2 ADVANCED`,
-                    body: 'POPKID TECH • Ultra Performance',
-                    thumbnailUrl: MENU_IMAGE_URL,
-                    sourceUrl: 'https://whatsapp.com/channel/0029VacgxK96hENmSRMRxx1r',
-                    mediaType: 1,
-                    renderLargerThumbnail: true
-                }
-            }
+            mentions: [sender]
+        }, { quoted: mek });
+
+        // ===== Send Interactive List =====
+        await conn.sendMessage(from, {
+            text: "📜 Select a command category below:",
+            footer: "POP KID-MD V4 • POWERED BY POPKID TECH",
+            title: "POP KID-MD COMMAND CENTER",
+            buttonText: "OPEN MENU",
+            sections: sections
         }, { quoted: mek });
 
     } catch (err) {
