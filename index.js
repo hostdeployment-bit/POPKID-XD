@@ -151,14 +151,13 @@ async function connectToWA() {
           console.log('[ 🪀 ] Bot connected to WhatsApp 📲')
 
           let up = `╔════════════════╗
-
 ║ 🤖 CONNECTED
 ╠════════════════╣
 ║ 🔑 PREFIX  : ${config.PREFIX}
 ║ 👨‍💻 DEV     : POPKID-MD
 ║ 📞 DEV NO : 254732297194
 ╚════════════════╝`;
-    conn.sendMessage(conn.user.id, { image: { url: `https://files.catbox.moe/d1stg5.jpg` }, caption: up })
+    conn.sendMessage(conn.user.id, { image: { url: `https://files.catbox.moe/j9ia5c.png` }, caption: up })
 
           const channelJid = "120363289379419860@newsletter"
           try {
