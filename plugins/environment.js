@@ -13,8 +13,8 @@ const path = require('path');
 //  PREFIX SETTINGS (FIXED)
 //--------------------------------------------
 cmd({
-    pattern: "setprefix",
-    alias: ["prefix"],
+    pattern: "setprefix1",
+    alias: ["prefix1"],
     react: "🔧",
     desc: "Change the bot's command prefix.",
     category: "settings",
