@@ -1,23 +1,24 @@
 const { cmd } = require('../command');
-const config = require('../config'); // This imports your config file
+const config = require('../config');
 
 cmd({
     pattern: "setprefix",
-    desc: "Update the command prefix",
+    desc: "Update the bot's command prefix",
     category: "owner",
     react: "⚙️",
     filename: __filename
 }, async (conn, m, mek, { from, reply, text, isOwner }) => {
 
-    // 🛡️ Safety: Using the OWNER_NUMBER check from your config
+    // 🛡️ Ensure only the owner can change the system prefix
     if (!isOwner) return reply("*❌ ᴏᴡɴᴇʀ ᴏɴʟʏ ᴄᴏᴍᴍᴀɴᴅ*");
 
+    // Check if the user actually typed a new prefix
     if (!text) return reply("*⚠️ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴘʀᴇғɪx (ᴇ.ɢ .sᴇᴛᴘʀᴇғɪx !)*");
 
     try {
-        // This updates the prefix in the current running process
-        config.PREFIX = text; 
-        
+        // Update the live config prefix
+        config.PREFIX = text;
+
         // Success Reaction
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
@@ -25,15 +26,15 @@ cmd({
         const caption = `*⚙️ P O P K I D  S E T T I N G S 💝*\n\n` +
                         `*✨ sᴛᴀᴛᴜs:* ᴘʀᴇғɪx ᴜᴘᴅᴀᴛᴇᴅ ʟɪᴠᴇ\n` +
                         `*🎯 ɴᴇᴡ ᴘʀᴇғɪx:* [ ${text} ]\n\n` +
-                        `> *© ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴘᴏᴘᴋɪᴅ*`;
+                        `> *ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs ᴡɪʟʟ ɴᴏᴡ ʀᴇsᴘᴏɴᴅ ᴛᴏ ${text}*`;
 
         await conn.sendMessage(from, { 
-            image: { url: config.ALIVE_IMG }, // Uses your alive image from config
+            image: { url: config.ALIVE_IMG || "https://files.catbox.moe/j9ia5c.png" }, 
             caption: caption 
         }, { quoted: mek });
 
     } catch (e) {
-        console.log(e);
+        console.error(e);
         reply("*❗ sʏsᴛᴇᴍ ᴇʀʀᴏʀ: ᴜɴᴀʙʟᴇ ᴛᴏ ᴍᴏᴅɪғʏ ᴘʀᴇғɪx*");
     }
 });
