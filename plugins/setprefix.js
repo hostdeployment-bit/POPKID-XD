@@ -29,7 +29,7 @@ cmd({
                         `> *ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs ᴡɪʟʟ ɴᴏᴡ ʀᴇsᴘᴏɴᴅ ᴛᴏ ${text}*`;
 
         await conn.sendMessage(from, { 
-            image: { url: config.ALIVE_IMG || "https://files.catbox.moe/j9ia5c.png" }, 
+            image: { url: config.ALIVE_IMG || "https://files.catbox.moe/7t824v.jpg" }, 
             caption: caption 
         }, { quoted: mek });
 
