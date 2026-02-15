@@ -28,7 +28,7 @@ const footer =
 
 cmd({
     pattern: "config",
-    alias: ["varlist", "envlist"],
+    alias: ["settings", "env"],
     desc: "Show all bot configuration variables (Owner Only)",
     category: "system",
     react: "⚙️",
