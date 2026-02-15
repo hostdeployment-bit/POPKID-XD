@@ -4,7 +4,7 @@ const moment = require('moment-timezone');
 const { cmd, commands } = require('../command');
 
 // ✅ Your Live Image URL
-const MENU_IMAGE_URL = "https://files.catbox.moe/7t824v.jpg";
+const MENU_IMAGE_URL = "https://files.catbox.moe/aapw1p.png";
 
 // =====================
 // Helpers
