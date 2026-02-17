@@ -1,71 +1,57 @@
-const config = require('../config');
-const axios = require('axios');
 const { cmd } = require('../command');
+const axios = require('axios');
+const { createButtons } = require('gifted-btns'); // Importing the button handler
 
 cmd({
-  pattern: 'play',
-  desc: 'Search & play YouTube audio',
-  category: 'downloader',
-  filename: __filename
-}, async (conn, mek, m, { from, args, reply }) => {
-  try {
-    if (!args.length) {
-      return reply('❌ *Provide a song name*\n\nExample:\n.play Kau masih kekasihku');
-    }
+    pattern: "play",
+    desc: "Fetch audio/video details from YouTube",
+    category: "download",
+    filename: __filename
+}, async (conn, m, mek, { from, q, reply }) => {
+    try {
+        if (!q) return reply("❗ Please provide a YouTube URL.");
 
-    const query = args.join(' ');
-    // Updated API to Jawad-Tech
-    const api = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(query)}`;
-
-    await conn.sendMessage(from, {
-      react: { text: '🎧', key: mek.key }
-    });
-
-    const { data } = await axios.get(api);
-
-    if (!data.status || !data.result) {
-      return reply('❌ *Failed to find the song*');
-    }
-
-    const res = data.result;
-
-    const caption = `
-╭═══〘 *YOUTUBE PLAY* 〙═══⊷
-┃❍ *Title:* ${res.title}
-┃❍ *Quality:* 128kbps
-┃❍ *Size:* Unknown
-┃❍ *Format:* mp3
-╰═════════════════════════⊷
-
-> *${config.BOT_NAME || 'POP KID-MD'}*
-> Powered by JawadTech API
-    `.trim();
-
-    await conn.sendMessage(from, {
-      audio: { url: res.mp3 }, // Changed from res.dlink to res.mp3
-      mimetype: 'audio/mpeg',
-      fileName: `${res.title}.mp3`,
-      caption,
-      contextInfo: {
-        forwardingScore: 5,
-        isForwarded: true,
-        externalAdReply: {
-          title: res.title,
-          body: 'YouTube Audio Player',
-          thumbnailUrl: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png', // Generic YT icon as API doesn't provide thumb
-          sourceUrl: query,
-          mediaType: 1,
-          renderLargerThumbnail: true
+        // 1. Fetch data from your specific API
+        const apiUrl = `https://rest.alyabotpe.xyz/dl/youtubeplay?url=${encodeURIComponent(q)}&key=stellar-PSnzL1zZ`;
+        const response = await axios.get(apiUrl);
+        
+        if (!response.data || !response.data.status) {
+            return reply("❌ API Error: Could not retrieve media information.");
         }
-      }
-    }, { quoted: mek });
 
-    await conn.sendMessage(from, {
-      react: { text: '✅', key: mek.key }
-    });
+        const info = response.data.data;
+        const title = info.title;
+        const thumbnail = info.thumbnail;
+        
+        // 2. Extract specific URLs (Selecting the first entry for each)
+        const videoUrl = info.videos?.[0]?.url;
+        const audioUrl = info.audios?.[0]?.url;
 
-  } catch (e) {
-    console.error(e);
-    reply(`❌ Error: ${e.message}`);
-  }
+        if (!videoUrl && !audioUrl) return reply("❌ No downloadable links found.");
+
+        // 3. Prepare the display message
+        let caption = `🎬 *YOUTUBE DOWNLOADER*\n\n`;
+        caption += `📝 *Title:* ${title}\n\n`;
+        caption += `*Tap a button below to get your file:*`;
+
+        // 4. Create Buttons using gifted-btns
+        // We pass the URL in the ID so the listener knows what to download
+        const buttons = [
+            { type: 'reply', text: '🎧 Audio (MP3)', id: `download_mp3|${audioUrl}` },
+            { type: 'reply', text: '🎥 Video (MP4)', id: `download_mp4|${videoUrl}` }
+        ];
+
+        // 5. Send the message
+        return await conn.sendMessage(from, {
+            image: { url: thumbnail },
+            caption: caption,
+            footer: 'Powered by Alyabot API',
+            buttons: buttons,
+            headerType: 4
+        }, { quoted: mek });
+
+    } catch (e) {
+        console.error("Play Command Error:", e);
+        return reply("❌ *Error:* " + e.message);
+    }
 });
