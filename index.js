@@ -210,11 +210,12 @@ function getCurrentDateTimeParts() {
 
 // Auto Bio Update Interval
 setInterval(async () => {
-    if (config.AUTO_BIO === "true" && conn?.user) {
+    if (config.AUTO_BIO === "true") {
         const { date, time } = getCurrentDateTimeParts(); // Get separated date and time
         const bioText = `❤️ ᴘᴏᴘᴋɪᴅ xᴍᴅ ʙᴏᴛ 🤖 ɪs ʟɪᴠᴇ ɴᴏᴡ\n📅 ${date}\n⏰ ${time}`;
         try {
-            await conn.updateProfileStatus(bioText);
+            await conn.setStatus(bioText);
+            console.log(`Updated Bio: ${bioText}`);
         } catch (err) {
             console.error("Failed to update Bio:", err);
         }
@@ -234,7 +235,7 @@ conn?.ev?.on('messages.update', async updates => {
 
   conn.ev.on("group-participants.update", (update) => GroupEvents(conn, update));	  
 	  
-  //=============readstatus=======
+  //=============readstatus & reactions (FIXED)=======
         
   conn.ev.on('messages.upsert', async(mek) => {
     mek = mek.messages[0]
@@ -243,45 +244,53 @@ conn?.ev?.on('messages.update', async updates => {
     ? mek.message.ephemeralMessage.message 
     : mek.message;
 
-    // Fixed Status Logic
-    if (mek.key && mek.key.remoteJid === 'status@broadcast') {
-        if (config.AUTO_STATUS_SEEN === "true") {
-            await conn.readMessages([mek.key])
-        }
-        if (config.AUTO_STATUS_REACT === "true") {
-            const emojis = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '🖤', '💚'];
-            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-            await conn.sendMessage(mek.key.remoteJid, {
-                react: { text: randomEmoji, key: mek.key } 
-            }, { statusJidList: [mek.key.participant, conn.user.id.split(':')[0] + '@s.whatsapp.net'] });
-        }
-        if (config.AUTO_STATUS_REPLY === "true") {
-            const user = mek.key.participant
-            const text = `${config.AUTO_STATUS_MSG}`
-            await conn.sendMessage(user, { text: text }, { quoted: mek })
-        }
-        return // End status processing here
-    }
+    const from = mek.key.remoteJid
+    const isStatus = from === 'status@broadcast'
 
-  if (config.READ_MESSAGE === 'true') {
+  if (config.READ_MESSAGE === 'true' && !isStatus) {
     await conn.readMessages([mek.key]);  // Mark message as read
-    console.log(`Marked message from ${mek.key.remoteJid} as read.`);
   }
 
     if(mek.message.viewOnceMessageV2)
     mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
     
+    // --- Optimized Status Section ---
+    if (isStatus) {
+      const statusTasks = [];
+
+      if (config.AUTO_STATUS_SEEN === "true") {
+        statusTasks.push(conn.readMessages([mek.key]));
+      }
+
+      if (config.AUTO_STATUS_REACT === "true") {
+        const ravlike = await conn.decodeJid(conn.user.id);
+        const emojis = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '🖤', '💚'];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        statusTasks.push(conn.sendMessage(from, {
+          react: { text: randomEmoji, key: mek.key } 
+        }, { statusJidList: [mek.key.participant, ravlike] }));
+      }
+
+      if (config.AUTO_STATUS_REPLY === "true") {
+        const user = mek.key.participant
+        const text = `${config.AUTO_STATUS_MSG}`
+        statusTasks.push(conn.sendMessage(user, { text: text, react: { text: '💜', key: mek.key } }, { quoted: mek }));
+      }
+      
+      // Execute all status actions in parallel to avoid lag
+      Promise.all(statusTasks).catch(e => console.error("Status Processing Error:", e));
+    }
+    // --- End Optimized Status Section ---
+
             await Promise.all([
               saveMessage(mek),
             ]);
   const m = sms(conn, mek)
   const type = getContentType(mek.message)
   const content = JSON.stringify(mek.message)
-  const from = mek.key.remoteJid
   const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage.contextInfo != null ? mek.message.extendedTextMessage.contextInfo.quotedMessage || [] : []
   const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
   
-  // ✅ FIXED: Using config.PREFIX directly for dynamic updates
   const isCmd = body.startsWith(config.PREFIX)
   var budy = typeof mek.text == 'string' ? mek.text : false;
   const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : ''
@@ -855,7 +864,7 @@ if (!isReact && config.CUSTOM_REACT === 'true') {
         };
 
         // Status aka brio
-        conn.updateProfileStatus = (status) => {
+        conn.setStatus = status => {
             conn.query({
                 tag: 'iq',
                 attrs: {
