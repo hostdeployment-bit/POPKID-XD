@@ -10,40 +10,57 @@ cmd({
     filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
     try {
-        if (!q) return reply("❌ Please provide a song name!");
+        if (!q) return reply("❌ Please provide a song name, Popkid!");
 
         await conn.sendMessage(from, { react: { text: "🎧", key: mek.key } });
 
-        // 1. Search Tubidy
-        const searchUrl = `https://tubidy.cool/search.php?q=${encodeURIComponent(q)}`;
-        const { data: searchHtml } = await axios.get(searchUrl);
+        // 1. Search Tubidy (Updated to latest 2026 domain)
+        const baseUrl = 'https://tubidy.cv';
+        const searchUrl = `${baseUrl}/search.php?q=${encodeURIComponent(q)}`;
+        
+        const { data: searchHtml } = await axios.get(searchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36' }
+        });
+        
         const $ = cheerio.load(searchHtml);
 
-        // Get the link to the first search result
-        const firstResult = $('.media-list .media-body a').first().attr('href');
-        const songTitle = $('.media-list .media-body a').first().text().trim();
+        // Flexible selector: finds the first link that looks like a song result
+        const firstResult = $('a[href*="watch/"]').first();
+        const songPath = firstResult.attr('href');
+        const songTitle = firstResult.text().trim() || "Popkid Music";
 
-        if (!firstResult) return reply("❌ Song not found on Tubidy.");
+        if (!songPath) {
+            return reply("❌ Song not found. Try adding the artist name (e.g., .play Burna Boy City Boys)");
+        }
 
-        // 2. Go to the download page
-        const downloadPageUrl = `https://tubidy.cool/${firstResult}`;
+        // 2. Navigate to the download options page
+        const downloadPageUrl = `${baseUrl}/${songPath}`;
         const { data: downloadHtml } = await axios.get(downloadPageUrl);
         const $$ = cheerio.load(downloadHtml);
 
-        // Find the MP3 download link (usually the first 'Audio' link)
-        const downloadUrl = $$('a:contains("MP3 Audio")').attr('href');
+        // Find the MP3 download button
+        // Tubidy usually hides the direct link behind another button
+        const mp3Page = $$('a:contains("MP3")').first().attr('href');
+        
+        if (!mp3Page) return reply("❌ MP3 format not available for this song.");
 
-        if (!downloadUrl) return reply("❌ Failed to fetch the download link.");
+        // 3. Get final direct link
+        const finalPageUrl = `${baseUrl}/${mp3Page}`;
+        const { data: finalHtml } = await axios.get(finalPageUrl);
+        const $$$ = cheerio.load(finalHtml);
+        const directLink = $$$('a.download-button, a:contains("Download MP3")').first().attr('href');
 
-        // 3. Send the Audio
+        if (!directLink) return reply("❌ Failed to capture direct download link.");
+
+        // 4. Send the Audio
         await conn.sendMessage(from, {
-            audio: { url: downloadUrl },
+            audio: { url: directLink.startsWith('http') ? directLink : `${baseUrl}/${directLink}` },
             mimetype: 'audio/mpeg',
             fileName: `${songTitle}.mp3`,
             contextInfo: {
                 externalAdReply: {
                     title: songTitle,
-                    body: "POPKID-MD TUBIDY PLAYER",
+                    body: "POPKID-MD TUBIDY",
                     mediaType: 1,
                     sourceUrl: searchUrl,
                     showAdAttribution: true,
@@ -55,7 +72,7 @@ cmd({
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (e) {
-        console.error(e);
-        reply(`❌ Error: ${e.message}`);
+        console.error("TUBIDY ERROR:", e.message);
+        reply(`❌ System Error: ${e.message}`);
     }
 });
