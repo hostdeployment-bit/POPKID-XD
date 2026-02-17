@@ -4,7 +4,7 @@ const cheerio = require('cheerio');
 
 cmd({
     pattern: "play",
-    desc: "Fast music downloader via McTwize",
+    desc: "Fast downloader for Popkid",
     category: "downloader",
     filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
@@ -13,47 +13,60 @@ cmd({
 
         await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
 
-        // 1. Search McTwize
+        // 1. Updated McTwize Search (Handles multi-word queries better)
         const searchUrl = `https://mctwize.co.za/search?q=${encodeURIComponent(q)}`;
-        const { data: searchHtml } = await axios.get(searchUrl);
+        
+        // Adding headers makes McTwize think you are a real phone, preventing 400 errors
+        const { data: searchHtml } = await axios.get(searchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' }
+        });
+        
         const $ = cheerio.load(searchHtml);
 
-        // Find the first result link and title
-        const firstResult = $('.video-card a').first();
-        const songPath = firstResult.attr('href');
-        const songTitle = $('.video-card .video-title').first().text().trim();
+        // Find the first video/song card
+        const firstSong = $('.video-card a').first();
+        const songPath = firstSong.attr('href');
+        const songTitle = firstSong.find('.video-title').text().trim() || q;
 
-        if (!songPath) return reply("❌ Song not found on McTwize.");
+        if (!songPath) {
+            return reply("❌ Song not found. Try a simpler name like: .play Fave Mr Man");
+        }
 
         // 2. Navigate to Download Page
-        const downloadPageUrl = songPath.startsWith('http') ? songPath : `https://mctwize.co.za${songPath}`;
-        const { data: downloadHtml } = await axios.get(downloadPageUrl);
+        const downloadPage = `https://mctwize.co.za${songPath}`;
+        const { data: downloadHtml } = await axios.get(downloadPage);
         const $$ = cheerio.load(downloadHtml);
 
-        // 3. Extract the Direct MP3 Link
-        // McTwize usually lists download buttons; we target the Audio/MP3 one
-        const directDownloadUrl = $$('a:contains("Download MP3"), a[href*=".mp3"]').first().attr('href');
+        // 3. Find the DIRECT MP3 Link
+        // McTwize links often change, so we look for ANY link that contains "download" and "mp3"
+        let downloadUrl = $$('a[href*="/download/"][href*="mp3"]').attr('href') 
+                       || $$('a:contains("Download MP3")').attr('href');
 
-        if (!directDownloadUrl) return reply("❌ Could not find a direct download link.");
+        if (!downloadUrl) return reply("❌ Download link not available for this song.");
 
-        // 4. Send with Buttons (using gifted-btns)
-        const btnList = [
-            { buttonId: `.down_mp3 ${directDownloadUrl}`, buttonText: { displayText: '🎵 Confirm MP3' }, type: 1 }
-        ];
+        // Ensure the URL is full
+        const finalUrl = downloadUrl.startsWith('http') ? downloadUrl : `https://mctwize.co.za${downloadUrl}`;
 
-        const buttonMessage = {
-            image: { url: $$('video').attr('poster') || 'https://telegra.ph/file/ba64a13e617d5b8823f95.jpg' },
-            caption: `*Title:* ${songTitle}\n*Source:* McTwize Fast Server\n\nClick below to receive your audio:`,
-            footer: 'POPKID-MD BY POPKID',
-            buttons: btnList,
-            headerType: 4
-        };
+        // 4. Send the Audio
+        await conn.sendMessage(from, {
+            audio: { url: finalUrl },
+            mimetype: 'audio/mpeg',
+            fileName: `${songTitle}.mp3`,
+            contextInfo: {
+                externalAdReply: {
+                    title: songTitle,
+                    body: "POPKID-MD FAST DL",
+                    thumbnailUrl: "https://files.catbox.moe/aapw1p.png", // Default Popkid Icon
+                    mediaType: 1,
+                    renderLargerThumbnail: false
+                }
+            }
+        }, { quoted: mek });
 
-        await conn.sendMessage(from, buttonMessage, { quoted: mek });
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (e) {
         console.error(e);
-        reply(`❌ McTwize Error: ${e.message}`);
+        reply(`❌ System Busy. Error: ${e.message}`);
     }
 });
