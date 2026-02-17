@@ -2,67 +2,53 @@ const { cmd } = require('../command');
 const axios = require('axios');
 
 cmd({
-    pattern: "song",
-    desc: "Download audio from YouTube by name or link",
-    category: "main",
+    pattern: "play",
+    desc: "Download and play music from YouTube",
+    category: "download",
     filename: __filename
-}, async (conn, m, mek, { from, args, reply }) => {
+}, async (conn, m, mek, { from, quoted, body, isCmd, command, args, q, reply }) => {
     try {
-        if (!args[0]) {
-            return reply("❌ Please provide a song name or link, Popkid!\n\nExample:\n.song cardigan");
+        if (!q) return reply("Please provide a YouTube URL or song name! 🎵");
+
+        // 1. React to show the bot is processing
+        await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
+
+        // 2. Call your custom API
+        // Note: If 'q' is a name, you might need a search step first, 
+        // but here we assume 'q' is the URL as per your API example.
+        const apiUrl = `https://eliteprotech-apis.zone.id/ytdown?url=${encodeURIComponent(q)}&format=mp3`;
+        const response = await axios.get(apiUrl);
+        const data = response.data;
+
+        if (!data.success) {
+            return reply("❌ Failed to fetch audio. Please check the link.");
         }
 
-        const query = args.join(" ");  
-        const start = Date.now();  
+        const { title, downloadURL } = data;
 
-        await conn.sendMessage(from, { react: { text: "🎧", key: mek.key } });  
+        // 3. Send the Audio with Context Info (External Ad Reply)
+        await conn.sendMessage(from, {
+            audio: { url: downloadURL },
+            mimetype: 'audio/mpeg',
+            fileName: `${title}.mp3`,
+            contextInfo: {
+                externalAdReply: {
+                    showAdAttribution: true,
+                    title: title,
+                    body: "Popkid AI - Music Downloader",
+                    thumbnailUrl: `https://img.youtube.com/vi/${q.split('v=')[1]?.split('&')[0] || 'k_-ipa1VasM'}/0.jpg`,
+                    sourceUrl: q,
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: mek });
 
-        let videoUrl = query;  
+        // 4. Success Reaction
+        await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
-        // 1. Search Logic (Yupra API)
-        if (!query.includes("youtube.com") && !query.includes("youtu.be")) {  
-            const searchUrl = `https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`;  
-            const searchRes = await axios.get(searchUrl);  
-
-            if (!searchRes.data.status || !searchRes.data.results || searchRes.data.results.length === 0) {  
-                return reply("❌ No results found.");  
-            }  
-
-            videoUrl = searchRes.data.results[0].url;  
-        }  
-
-        // 2. Download Logic (Jawad-Tech API as requested)
-        const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(videoUrl)}`;  
-        const { data } = await axios.get(apiUrl);  
-
-        if (!data.status || !data.result || !data.result.mp3) {  
-            return reply("❌ API failed to generate an audio link. Try again later.");  
-        }  
-
-        const title = data.result.title || "Popkid-Audio";  
-        const audioDownloadUrl = data.result.mp3; 
-
-        const end = Date.now();  
-        const speed = end - start;  
-
-        // 3. Inform User
-        await reply(  
-            `🎧 *Popkid Audio Downloader*\n\n` +  
-            `📌 *Title:* ${title}\n` +  
-            `⚡ *Speed:* ${speed} ms\n\n` +  
-            `⬇️ Sending audio file...`  
-        );  
-
-        // 4. Send Audio (Optimized for WhatsApp compatibility)
-        await conn.sendMessage(from, {  
-            audio: { url: audioDownloadUrl },  
-            mimetype: "audio/mpeg",  
-            fileName: `${title}.mp3`, // Adding extension helps prevent the "audio not available" error
-            ptt: false // Set to true if you want it sent as a voice note
-        }, { quoted: mek });  
-
-    } catch (err) {  
-        console.error(err);  
-        reply("❌ Error: " + err.message);  
+    } catch (e) {
+        console.log(e);
+        reply(`❌ Error: ${e.message}`);
     }
 });
