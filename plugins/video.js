@@ -1,66 +1,115 @@
 const { cmd } = require('../command');
 const axios = require('axios');
+const yts = require('yt-search');
+const { sendButtons } = require('gifted-btns');
+
+// API Engine
+const API_BASE = 'https://api-aswin-sparky.koyeb.app/api/downloader';
 
 cmd({
     pattern: "video",
-    desc: "Download video from YouTube by name or link",
-    category: "main",
+    alias: ["ytv", "mp4"],
+    desc: "Download video in 2 formats: MP4 and Video Document",
+    category: "downloader",
     filename: __filename
-}, async (conn, m, mek, { from, args, reply }) => {
+}, async (conn, mek, m, { from, q, reply, botName, botFooter, botPic }) => {
     try {
-        if (!args[0]) {
-            return reply("❌ Give me a video name or YouTube link!\n\nExample:\n.video arike kumnie\n.video https://youtu.be/xxxx");
-        }
-
-        const query = args.join(" ");
-        const start = Date.now();
-
+        if (!q) return reply("🎥 *Popkid, please provide a video name or link!*");
+        
         await conn.sendMessage(from, { react: { text: "🎬", key: mek.key } });
 
-        let videoUrl = query;
+        // Search for video details
+        const search = await yts(q);
+        const video = search.videos[0];
+        if (!video) return reply("❌ No results found.");
 
-        // If it's NOT a YouTube link, search first using Yupra search
-        if (!query.includes("youtube.com") && !query.includes("youtu.be")) {
-            const searchUrl = `https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`;
-            const searchRes = await axios.get(searchUrl);
+        const dateNow = Date.now();
 
-            if (!searchRes.data.status || !searchRes.data.results || searchRes.data.results.length === 0) {
-                return reply("❌ No results found for that video.");
+        // Fancy Premium Video Caption
+        const fancyCaption = `
+╔═══════════════════╗
+     🎥  *𝐏𝐎𝐏𝐊𝐈𝐃-𝐌𝐃 𝐕𝐈𝐃𝐄𝐎* 🎥
+╚═══════════════════╝
+
+📌 *𝐓𝐢𝐭𝐥𝐞:* ${video.title}
+🕒 *𝐃𝐮𝐫𝐚𝐭𝐢𝐨𝐧:* ${video.timestamp}
+👤 *𝐂𝐡𝐚𝐧𝐧𝐞𝐥:* ${video.author.name}
+👁️ *𝐕𝐢𝐞𝐰𝐬:* ${video.views.toLocaleString()}
+
+🚀 *𝐒𝐞𝐥𝐞𝐜𝐭 𝐕𝐢𝐝𝐞𝐨 𝐅𝐨𝐫𝐦𝐚𝐭:*
+_You can download both if you like!_
+`.trim();
+
+        // Send Gifted Style Buttons
+        await sendButtons(conn, from, {
+            title: `ᴠɪᴅᴇᴏ ᴍᴜʟᴛɪ-ᴅᴏᴡɴʟᴏᴀᴅᴇʀ`,
+            text: fancyCaption,
+            footer: botFooter || 'ᴘᴏᴘᴋɪᴅ ᴀɪ ᴋᴇɴʏᴀ 🇰🇪',
+            image: video.thumbnail || botPic,
+            buttons: [
+                { id: `vid_${video.id}_${dateNow}`, text: "🎥 𝐕𝐢𝐝𝐞𝐨 (𝐌𝐏𝟒)" },
+                { id: `vdoc_${video.id}_${dateNow}`, text: "📁 𝐕𝐢𝐝𝐞𝐨 𝐃𝐨𝐜𝐮𝐦𝐞𝐧𝐭" }
+            ],
+        });
+
+        // ==================== MULTI-RESPONSE HANDLER ====================
+        const handleVideoResponse = async (event) => {
+            const messageData = event.messages[0];
+            if (!messageData.message) return;
+
+            const selectedButtonId = messageData.message?.templateButtonReplyMessage?.selectedId || 
+                                     messageData.message?.buttonsResponseMessage?.selectedButtonId;
+            
+            // Validate the click for this specific session
+            if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`)) return;
+            if (messageData.key?.remoteJid !== from) return;
+
+            await conn.sendMessage(from, { react: { text: "📥", key: messageData.key } });
+
+            try {
+                // Using the stable Aswin Sparky API for downloads
+                const { data } = await axios.get(`${API_BASE}/ytv?url=${encodeURIComponent(video.url)}`);
+                if (!data.status) return;
+                
+                const downloadUrl = data.data.url;
+                const buttonType = selectedButtonId.split("_")[0];
+
+                if (buttonType === "vid") {
+                    // Send as normal Video
+                    await conn.sendMessage(from, { 
+                        video: { url: downloadUrl }, 
+                        caption: `🎬 *${video.title}*\n_Downloaded by Popkid-MD_`,
+                        mimetype: "video/mp4"
+                    }, { quoted: messageData });
+                } 
+                
+                else if (buttonType === "vdoc") {
+                    // Send as Video Document
+                    await conn.sendMessage(from, { 
+                        document: { url: downloadUrl }, 
+                        mimetype: "video/mp4", 
+                        fileName: `${video.title}.mp4`,
+                        caption: `📂 *${video.title}* (Document)`
+                    }, { quoted: messageData });
+                }
+
+                await conn.sendMessage(from, { react: { text: "✅", key: messageData.key } });
+                
+                // Note: Listener stays ON so the user can click the other button too!
+            } catch (err) {
+                console.error("Video Button Error:", err);
             }
+        };
 
-            // Take first result
-            videoUrl = searchRes.data.results[0].url;
-        }
+        // Register the event listener
+        conn.ev.on("messages.upsert", handleVideoResponse);
 
-        // Now download using Jawad-Tech YTDL API
-        const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(videoUrl)}`;
-        const { data } = await axios.get(apiUrl);
+        // Auto-kill listener after 5 minutes to prevent memory leaks
+        setTimeout(() => {
+            conn.ev.off("messages.upsert", handleVideoResponse);
+        }, 300000);
 
-        if (!data.status || !data.result || !data.result.mp4) {
-            return reply("❌ Failed to get the video. Try another link or name.");
-        }
-
-        const title = data.result.title || "YouTube Video";
-        const videoDownloadUrl = data.result.mp4;
-
-        const end = Date.now();
-        const speed = end - start;
-
-        await reply(
-            `🎬 *YouTube Video Downloader*\n\n` +
-            `📌 *Title:* ${title}\n` +
-            `⚡ *Speed:* ${speed} ms\n\n` +
-            `⬇️ Sending video...`
-        );
-
-        await conn.sendMessage(from, {
-            video: { url: videoDownloadUrl },
-            mimetype: "video/mp4",
-            caption: title
-        }, { quoted: mek });
-
-    } catch (err) {
-        console.error(err);
-        reply("❌ Error while processing your video request.");
+    } catch (e) {
+        reply(`❌ Popkid, video search failed: ${e.message}`);
     }
 });
