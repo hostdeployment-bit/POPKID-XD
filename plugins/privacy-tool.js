@@ -296,8 +296,8 @@ async (conn, mek, m, { from, l, quoted, body, isCmd, command, args, q, isGroup, 
 });
 
 cmd({
-    pattern: "getpp",
-    alias: ["stealpp"],
+    pattern: "getpp2",
+    alias: ["stealpp2"],
     react: "🖼️",
     desc: "Sends the profile picture of a user by phone number (owner only)",
     category: "owner",
