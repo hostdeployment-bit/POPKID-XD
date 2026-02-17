@@ -1,49 +1,66 @@
-const axios = require('axios');
 const { cmd } = require('../command');
+const axios = require('axios');
 
 cmd({
-  pattern: 'play',
-  desc: 'Play song (Alya API only)',
-  category: 'downloader',
-  filename: __filename
-}, async (conn, mek, m, { from, args, reply }) => {
+    pattern: "play",
+    desc: "Download audio (MP3) from YouTube by name or link",
+    category: "main",
+    filename: __filename
+}, async (conn, m, mek, { from, args, reply }) => {
+    try {
+        if (!args[0]) {
+            return reply("❌ Give me a song name or YouTube link!\n\nExample:\n.audio arike kumnie\n.audio https://youtu.be/xxxx");
+        }
 
-  try {
-    if (!args.length) {
-      return reply('Provide a song name.\nExample: .play cardigan');
+        const query = args.join(" ");
+        const start = Date.now();
+
+        await conn.sendMessage(from, { react: { text: "🎵", key: mek.key } });
+
+        let videoUrl = query;
+
+        // If NOT a YouTube link, search first
+        if (!query.includes("youtube.com") && !query.includes("youtu.be")) {
+            const searchUrl = `https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`;
+            const searchRes = await axios.get(searchUrl);
+
+            if (!searchRes.data.status || !searchRes.data.results || searchRes.data.results.length === 0) {
+                return reply("❌ No results found for that song.");
+            }
+
+            // Take first result
+            videoUrl = searchRes.data.results[0].url;
+        }
+
+        // Download using Jawad-Tech YTDL API
+        const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(videoUrl)}`;
+        const { data } = await axios.get(apiUrl);
+
+        if (!data.status || !data.result || !data.result.mp3) {
+            return reply("❌ Failed to get the audio. Try another link or name.");
+        }
+
+        const title = data.result.title || "YouTube Audio";
+        const audioDownloadUrl = data.result.mp3;
+
+        const end = Date.now();
+        const speed = end - start;
+
+        await reply(
+            `🎵 *YouTube Audio Downloader*\n\n` +
+            `📌 *Title:* ${title}\n` +
+            `⚡ *Speed:* ${speed} ms\n\n` +
+            `⬇️ Sending audio...`
+        );
+
+        await conn.sendMessage(from, {
+            audio: { url: audioDownloadUrl },
+            mimetype: "audio/mpeg",
+            fileName: `${title}.mp3`
+        }, { quoted: mek });
+
+    } catch (err) {
+        console.error(err);
+        reply("❌ Error while processing your audio request.");
     }
-
-    const query = args.join(' ');
-
-    // 🔎 1. Search using Alya API
-    const searchUrl = `https://rest.alyabotpe.xyz/search/yt?query=${encodeURIComponent(query)}&key=stellar-PSnzL1zZ`;
-    const searchRes = await axios.get(searchUrl);
-
-    if (!searchRes.data.status || !searchRes.data.data.length) {
-      return reply('Song not found.');
-    }
-
-    // Get first result
-    const video = searchRes.data.data[0];
-    const videoUrl = video.url;
-
-    // 🎵 2. Download using Alya API
-    const downloadUrl = `https://rest.alyabotpe.xyz/dl/ytmp3?url=${encodeURIComponent(videoUrl)}&key=stellar-PSnzL1zZ`;
-    const { data } = await axios.get(downloadUrl);
-
-    if (!data.status) {
-      return reply('Failed to download song.');
-    }
-
-    // 🎧 3. Send audio only
-    await conn.sendMessage(from, {
-      audio: { url: data.data.dl },
-      mimetype: 'audio/mpeg',
-      fileName: `${data.data.title}.mp3`
-    }, { quoted: mek });
-
-  } catch (err) {
-    console.error(err);
-    reply('Error occurred.');
-  }
 });
