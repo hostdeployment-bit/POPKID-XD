@@ -1,78 +1,47 @@
 const { cmd } = require('../command');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const config = require('../config');
+const { buttons } = require('gifted-btns'); // Import your buttons library
 
 cmd({
     pattern: "play",
-    desc: "Download music from Tubidy",
+    desc: "Search music with buttons",
     category: "downloader",
     filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
     try {
         if (!q) return reply("❌ Please provide a song name, Popkid!");
 
-        await conn.sendMessage(from, { react: { text: "🎧", key: mek.key } });
+        await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
 
-        // 1. Search Tubidy (Updated to latest 2026 domain)
-        const baseUrl = 'https://tubidy.cv';
-        const searchUrl = `${baseUrl}/search.php?q=${encodeURIComponent(q)}`;
-        
-        const { data: searchHtml } = await axios.get(searchUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36' }
-        });
-        
+        // 1. Search Tubidy.buzz
+        const searchUrl = `https://www39.tubidy.buzz/search.php?q=${encodeURIComponent(q)}`;
+        const { data: searchHtml } = await axios.get(searchUrl);
         const $ = cheerio.load(searchHtml);
 
-        // Flexible selector: finds the first link that looks like a song result
-        const firstResult = $('a[href*="watch/"]').first();
-        const songPath = firstResult.attr('href');
-        const songTitle = firstResult.text().trim() || "Popkid Music";
+        const firstSongPath = $('.media-list .media-body a').first().attr('href');
+        const songTitle = $('.media-list .media-body a').first().text().trim();
 
-        if (!songPath) {
-            return reply("❌ Song not found. Try adding the artist name (e.g., .play Burna Boy City Boys)");
-        }
+        if (!firstSongPath) return reply("❌ Song not found!");
 
-        // 2. Navigate to the download options page
-        const downloadPageUrl = `${baseUrl}/${songPath}`;
-        const { data: downloadHtml } = await axios.get(downloadPageUrl);
-        const $$ = cheerio.load(downloadHtml);
+        // 2. Prepare the Button Message
+        // This uses the gifted-btns structure
+        const btnList = [
+            { buttonId: `.t_audio ${firstSongPath}`, buttonText: { displayText: '🎵 Audio (MP3)' }, type: 1 },
+            { buttonId: `.t_video ${firstSongPath}`, buttonText: { displayText: '🎥 Video (MP4)' }, type: 1 }
+        ];
 
-        // Find the MP3 download button
-        // Tubidy usually hides the direct link behind another button
-        const mp3Page = $$('a:contains("MP3")').first().attr('href');
-        
-        if (!mp3Page) return reply("❌ MP3 format not available for this song.");
+        const buttonMessage = {
+            text: `*Title:* ${songTitle}\n*Source:* Tubidy.buzz\n\nSelect your format below:`,
+            footer: 'POPKID-MD BY POPKID',
+            buttons: btnList,
+            headerType: 1
+        };
 
-        // 3. Get final direct link
-        const finalPageUrl = `${baseUrl}/${mp3Page}`;
-        const { data: finalHtml } = await axios.get(finalPageUrl);
-        const $$$ = cheerio.load(finalHtml);
-        const directLink = $$$('a.download-button, a:contains("Download MP3")').first().attr('href');
-
-        if (!directLink) return reply("❌ Failed to capture direct download link.");
-
-        // 4. Send the Audio
-        await conn.sendMessage(from, {
-            audio: { url: directLink.startsWith('http') ? directLink : `${baseUrl}/${directLink}` },
-            mimetype: 'audio/mpeg',
-            fileName: `${songTitle}.mp3`,
-            contextInfo: {
-                externalAdReply: {
-                    title: songTitle,
-                    body: "POPKID-MD TUBIDY",
-                    mediaType: 1,
-                    sourceUrl: searchUrl,
-                    showAdAttribution: true,
-                    renderLargerThumbnail: false
-                }
-            }
-        }, { quoted: mek });
-
-        await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
+        await conn.sendMessage(from, buttonMessage, { quoted: mek });
 
     } catch (e) {
-        console.error("TUBIDY ERROR:", e.message);
-        reply(`❌ System Error: ${e.message}`);
+        console.error(e);
+        reply("❌ Error fetching results.");
     }
 });
