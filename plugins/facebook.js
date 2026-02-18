@@ -1,143 +1,108 @@
 const { cmd } = require("../command");
 const getFBInfo = require("@xaviabot/fb-downloader");
 const config = require("../config");
-const fs = require("fs");
-const path = require("path");
-
-// Quoted Contact Message (Popkids Verified)
-const quotedContact = {
-  key: {
-    fromMe: false,
-    participant: `0@s.whatsapp.net`,
-    remoteJid: "status@broadcast"
-  },
-  message: {
-    contactMessage: {
-      displayName: "POP KIDS VERIFIED ✅",
-      vcard: `BEGIN:VCARD
-VERSION:3.0
-FN:POP KIDS VERIFIED ✅
-ORG:POP KIDS BOT;
-TEL;type=CELL;type=VOICE;waid=${config.OWNER_NUMBER || '0000000000'}:+${config.OWNER_NUMBER || '0000000000'}
-END:VCARD`
-    }
-  }
-};
+const { sendButtons } = require('gifted-btns');
 
 cmd({
     pattern: "fb",
     alias: ["facebook", "facebook1", "fb1"],
-    desc: "Download Facebook videos/audios",
+    desc: "Download Facebook videos/audios with buttons",
     category: "download",
     react: "📽️",
     filename: __filename
 },
-async (conn, mek, m, { from, q, reply }) => {
+async (conn, mek, m, { from, q, reply, botFooter, botPic }) => {
     try {
         const fbUrl = q && q.trim();
-        if (!fbUrl) return reply("Please send a Facebook video link!");
-        if (!fbUrl.includes("https://") || !fbUrl.includes("facebook.com"))
-            return reply("Please send a valid Facebook video link.");
+        if (!fbUrl) return reply("Please provide a Facebook video link!");
+        if (!fbUrl.includes("facebook.com") && !fbUrl.includes("fb.watch"))
+            return reply("Please provide a valid Facebook video link.");
 
         const videoData = await getFBInfo(fbUrl);
 
         if (!videoData || !videoData.sd)
-            return reply("Failed to fetch video. The link might be private or invalid.");
+            return reply("❌ Failed to fetch video. Ensure the video is public.");
 
-        const caption = `
-*${config.BOT || 'Facebook Downloader'} Facebook Downloader*
-|__________________________
-|       *𝐓𝐈𝐓𝐋𝐄*  
-       ${videoData.title || 'No title available'}
-|_________________________
-| REPLY WITH A NUMBER BELOW
-|_________________________
-|____  *𝐕𝐈𝐃𝐄𝐎*  ____
-|-᳆  1. SD Quality
-|-᳆  2. HD Quality
-|_________________________
-|____  *𝐀𝐔𝐃𝐈𝐎*  ____
-|-᳆  3. Audio Only
-|-᳆  4. As Document
-|-᳆  5. As Voice Message
-|__________________________|
-`;
+        const uniqueId = Math.random().toString(36).substring(7);
 
-        const sentMsg = await conn.sendMessage(from, {
-            image: { url: videoData.thumbnail || "" },
-            caption,
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: "120363289379419860@newsletter",
-                    newsletterName: "𝐩𝐨𝐩𝐤𝐢𝐝",
-                    serverMessageId: Math.floor(100000 + Math.random() * 900000),
-                }
-            }
-        }, { quoted: quotedContact }); // <-- Use verified contact here
+        const fancyCaption = `
+✨ *𝐏𝐎𝐏𝐊𝐈𝐃-𝐌𝐃 𝐅𝐁 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐑* ✨
 
-        // Reply handler: listen for reply with option
-        conn.ev.on("messages.upsert", async update => {
-            const msg = update.messages[0];
-            if (!msg.message?.extendedTextMessage) return;
-            const text = msg.message.extendedTextMessage.text.trim();
-            if (msg.message.extendedTextMessage.contextInfo?.stanzaId === sentMsg.key.id) {
-                await conn.sendMessage(from, { react: { text: "⬇️", key: msg.key } });
+📝 *𝐓𝐢𝐭𝐥𝐞:* ${videoData.title || 'Facebook Video'}
+🎬 *𝐐𝐮𝐚𝐥𝐢𝐭𝐲:* SD ${videoData.hd ? '/ HD Available' : ''}
 
-                switch (text) {
-                    case "1":
-                        await conn.sendMessage(from, {
-                            video: { url: videoData.sd },
-                            caption: `*${config.BOT || "Facebook Downloader"}* - SD Quality`
-                        }, { quoted: msg });
-                        break;
-                    case "2":
-                        if (videoData.hd) {
-                            await conn.sendMessage(from, {
-                                video: { url: videoData.hd },
-                                caption: `*${config.BOT || "Facebook Downloader"}* - HD Quality`
-                            }, { quoted: msg });
-                        } else {
-                            await conn.sendMessage(from, { text: "HD not available. Sending SD.", quoted: msg });
-                            await conn.sendMessage(from, {
-                                video: { url: videoData.sd },
-                                caption: `*${config.BOT || "Facebook Downloader"}* - SD Quality`
-                            }, { quoted: msg });
-                        }
-                        break;
-                    case "3":
-                        await conn.sendMessage(from, {
-                            audio: { url: videoData.sd },
-                            mimetype: "audio/mpeg",
-                            caption: `*${config.BOT || "Facebook Downloader"}* - Audio`
-                        }, { quoted: msg });
-                        break;
-                    case "4":
-                        await conn.sendMessage(from, {
-                            document: { url: videoData.sd },
-                            mimetype: "video/mp4",
-                            fileName: `${config.BOT || "Facebook"}_${Date.now()}.mp4`,
-                            caption: `*${config.BOT || "Facebook Downloader"}* - Video Document`
-                        }, { quoted: msg });
-                        break;
-                    case "5":
-                        await conn.sendMessage(from, {
-                            audio: { url: videoData.sd },
-                            mimetype: "audio/ogg; codecs=opus",
-                            ptt: true,
-                            caption: `*${config.BOT || "Facebook Downloader"}* - Voice Message`
-                        }, { quoted: msg });
-                        break;
-                    default:
-                        await conn.sendMessage(from, { text: "Please choose a number (1-5) only." }, { quoted: msg });
-                        break;
-                }
-                await conn.sendMessage(from, { react: { text: "✅", key: msg.key } });
-            }
+🚀 *𝐒𝐞𝐥𝐞𝐜𝐭 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐅𝐨𝐫𝐦𝐚𝐭:*
+`.trim();
+
+        await sendButtons(conn, from, {
+            title: `ꜰᴀᴄᴇʙᴏᴏᴋ ᴠɪᴅᴇᴏ ᴇɴɢɪɴᴇ`,
+            text: fancyCaption,
+            footer: botFooter || 'ᴘᴏᴘᴋɪᴅ ᴀɪ ᴋᴇɴʏᴀ 🇰🇪',
+            image: videoData.thumbnail || botPic,
+            buttons: [
+                { id: `fbsd_${uniqueId}`, text: "📽️ 𝐒𝐃 𝐕𝐢𝐝𝐞𝐨" },
+                { id: `fbhd_${uniqueId}`, text: "🎥 𝐇𝐃 𝐕𝐢𝐝𝐞𝐨" },
+                { id: `fbaud_${uniqueId}`, text: "🎵 𝐀𝐮𝐝𝐢𝐨 (𝐌𝐏𝟑)" }
+            ],
         });
 
+        // ==================== BUTTON HANDLER ====================
+        const handleFbResponse = async (update) => {
+            const messageData = update.messages[0];
+            if (!messageData.message) return;
+
+            const selectedButtonId = messageData.message?.templateButtonReplyMessage?.selectedId || 
+                                     messageData.message?.buttonsResponseMessage?.selectedButtonId;
+            
+            if (!selectedButtonId || !selectedButtonId.endsWith(uniqueId)) return;
+
+            // Kill listener after selection
+            conn.ev.off("messages.upsert", handleFbResponse);
+            await conn.sendMessage(from, { react: { text: "📥", key: messageData.key } });
+
+            try {
+                const type = selectedButtonId.split("_")[0];
+
+                switch (type) {
+                    case "fbsd":
+                        await conn.sendMessage(from, { 
+                            video: { url: videoData.sd }, 
+                            caption: `*${videoData.title || 'FB Video'}* - SD Quality` 
+                        }, { quoted: messageData });
+                        break;
+
+                    case "fbhd":
+                        const hdUrl = videoData.hd || videoData.sd;
+                        await conn.sendMessage(from, { 
+                            video: { url: hdUrl }, 
+                            caption: `*${videoData.title || 'FB Video'}* - ${videoData.hd ? 'HD' : 'SD (HD N/A)'} Quality` 
+                        }, { quoted: messageData });
+                        break;
+
+                    case "fbaud":
+                        await conn.sendMessage(from, { 
+                            audio: { url: videoData.sd }, 
+                            mimetype: "audio/mpeg" 
+                        }, { quoted: messageData });
+                        break;
+                }
+
+                await conn.sendMessage(from, { react: { text: "✅", key: messageData.key } });
+            } catch (err) {
+                console.error("FB Download Error:", err);
+                reply("❌ Error processing your request.");
+            }
+        };
+
+        // Start listening
+        conn.ev.on("messages.upsert", handleFbResponse);
+
+        // Cleanup listener after 5 minutes
+        setTimeout(() => {
+            conn.ev.off("messages.upsert", handleFbResponse);
+        }, 300000);
+
     } catch (error) {
-        await reply(`Failed to download video. Error: ${error.message}\nTry another link or make sure the video is public.`);
+        await reply(`❌ Error: ${error.message}`);
     }
 });
