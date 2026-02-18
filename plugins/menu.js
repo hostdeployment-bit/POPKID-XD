@@ -121,7 +121,7 @@ cmd({
                     name: "cta_url",
                     buttonParamsJson: JSON.stringify({
                         display_text: "🌐 Official Channel",
-                        url: "https://whatsapp.com"
+                        url: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
                     })
                 }
             ]
