@@ -2,24 +2,24 @@ const config = require('../config');
 const { cmd } = require('../command');
 const { handleCall } = require('../lib/anticall');
 
-// --- THE COMMAND TO ON/OFF ---
+// Command to turn it ON or OFF
 cmd({
     pattern: "anticall",
-    desc: "Enable/Disable call rejection",
+    desc: "Toggle automatic call rejection",
     category: "owner",
     filename: __filename
 }, async (conn, m, mek, { from, reply, args }) => {
     if (!args[0]) return reply("📍 *Usage:* .anticall on / .anticall off");
 
-    const status = args[0].toLowerCase();
+    const mode = args[0].toLowerCase();
 
-    if (status === "on") {
+    if (mode === "on") {
         config.ANTICALL = "true";
         await conn.sendMessage(from, { react: { text: "📵", key: mek.key } });
         return reply("🛡️ *Anticall is now ON.* (Calls will be rejected automatically)");
     } 
     
-    else if (status === "off") {
+    else if (mode === "off") {
         config.ANTICALL = "false";
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
         return reply("🔓 *Anticall is now OFF.*");
@@ -30,8 +30,9 @@ cmd({
     }
 });
 
-// --- THE CALL LISTENER ---
-// This special block ensures the bot listens for calls globally
+/** * This part depends on your framework's ability to handle custom events.
+ * We register it to listen for 'call' data.
+ */
 cmd({
     on: "call" 
 }, async (conn, call) => {
