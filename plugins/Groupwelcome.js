@@ -7,31 +7,32 @@ cmd({
     desc: "Turn welcome messages on or off",
     category: "group",
     filename: __filename
-}, async (conn, m, mek, { from, l, quote, reply, isGroup, participants, args }) => {
+}, async (conn, m, mek, { from, reply, isGroup, args }) => {
     try {
         if (!isGroup) return reply("✨ This command is for groups only.");
-        
-        // Admin Check
-        const groupMetadata = await conn.groupMetadata(from);
-        const isAdmin = groupMetadata.participants.find(p => p.id === m.sender && (p.admin === 'admin' || p.admin === 'superadmin'));
-        if (!isAdmin) return reply("❌ *Admin access required.*");
 
         if (!args[0]) return reply("📍 *Usage:* .welcome on / .welcome off");
 
-        if (args[0].toLowerCase() === "on") {
+        const status = args[0].toLowerCase();
+
+        if (status === "on") {
             config.WELCOME = "true";
             await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
-            return await reply("🌟 *Welcome messages enabled!*");
-        } else if (args[0].toLowerCase() === "off") {
+            return await reply("🌟 *Welcome messages have been enabled!*");
+        } 
+        
+        else if (status === "off") {
             config.WELCOME = "false";
             await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
-            return await reply("🚫 *Welcome messages disabled!*");
-        } else {
-            return reply("❓ Use *on* or *off*");
+            return await reply("🚫 *Welcome messages have been disabled!*");
+        } 
+        
+        else {
+            return reply("❓ Invalid option. Use *.welcome on* or *.welcome off*");
         }
     } catch (e) {
-        console.log(e);
-        reply("Error toggling welcome.");
+        console.error(e);
+        reply("⚠️ Error updating Welcome status.");
     }
 });
 
@@ -41,32 +42,31 @@ cmd({
     desc: "Turn goodbye messages on or off",
     category: "group",
     filename: __filename
-}, async (conn, m, mek, { from, l, quote, reply, isGroup, participants, args }) => {
+}, async (conn, m, mek, { from, reply, isGroup, args }) => {
     try {
         if (!isGroup) return reply("✨ This command is for groups only.");
-        
-        // Admin Check
-        const groupMetadata = await conn.groupMetadata(from);
-        const isAdmin = groupMetadata.participants.find(p => p.id === m.sender && (p.admin === 'admin' || p.admin === 'superadmin'));
-        if (!isAdmin) return reply("❌ *Admin access required.*");
 
         if (!args[0]) return reply("📍 *Usage:* .goodbye on / .goodbye off");
 
-        // Note: Your current groupevents.js uses config.WELCOME for both. 
-        // If you want separate control, you'd need config.GOODBYE in your config file.
-        if (args[0].toLowerCase() === "on") {
-            config.GOODBYE = "true"; 
+        const status = args[0].toLowerCase();
+
+        if (status === "on") {
+            config.GOODBYE = "true";
             await conn.sendMessage(from, { react: { text: "👋", key: mek.key } });
-            return await reply("🌟 *Goodbye messages enabled!*");
-        } else if (args[0].toLowerCase() === "off") {
+            return await reply("🌟 *Goodbye messages have been enabled!*");
+        } 
+        
+        else if (status === "off") {
             config.GOODBYE = "false";
             await conn.sendMessage(from, { react: { text: "📴", key: mek.key } });
-            return await reply("🚫 *Goodbye messages disabled!*");
-        } else {
-            return reply("❓ Use *on* or *off*");
+            return await reply("🚫 *Goodbye messages have been disabled!*");
+        } 
+        
+        else {
+            return reply("❓ Invalid option. Use *.goodbye on* or *.goodbye off*");
         }
     } catch (e) {
-        console.log(e);
-        reply("Error toggling goodbye.");
+        console.error(e);
+        reply("⚠️ Error updating Goodbye status.");
     }
 });
