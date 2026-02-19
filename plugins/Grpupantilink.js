@@ -7,21 +7,23 @@ cmd({
     desc: "Setup antilink actions",
     category: "group",
     filename: __filename
-}, async (conn, m, mek, { from, reply, isGroup, args, isAdmins }) => {
+}, async (conn, m, mek, { from, reply, isGroup, args }) => {
+    // We only check if it's a group, anyone can now trigger this
     if (!isGroup) return reply("Groups only.");
-    if (!isAdmins) return reply("Admin only.");
 
     const type = args[0] ? args[0].toLowerCase() : '';
     const action = args[1] ? args[1].toLowerCase() : '';
 
-    // .antilink on or .antilink off
+    // .antilink on / off
     if (type === "on") {
         config.ANTILINK = "true";
-        return reply("🛡️ Antilink is now *ON*");
+        await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
+        return reply("🛡️ Antilink is now *ON* for this session.");
     }
     if (type === "off") {
         config.ANTILINK = "false";
-        return reply("🔓 Antilink is now *OFF*");
+        await conn.sendMessage(from, { react: { text: "🔓", key: mek.key } });
+        return reply("🔓 Antilink is now *OFF*.");
     }
 
     // .antilink action delete/warn/kick
@@ -37,7 +39,7 @@ cmd({
     return reply("📍 *Commands:*\n.antilink on\n.antilink off\n.antilink action <delete/warn/kick>");
 });
 
-// Auto-detector
+// Auto-detector (remains active for all messages)
 cmd({ on: "body" }, async (conn, m, mek, { isGroup, isAdmins, isOwner }) => {
     await handleAntilink(conn, m, { isAdmins, isOwner });
 });
