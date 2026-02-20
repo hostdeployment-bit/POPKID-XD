@@ -1,49 +1,31 @@
 const { cmd } = require('../command');
-const { setAnti, getAnti, setPath, getPath } = require('../data');
+const { setAnti, getAnti } = require('../data/antidel');
+const { AntiDelete } = require('../lib/antidel');
 
 cmd({
     pattern: "antidelete",
-    desc: "Control AntiDelete system",
-    category: "settings",
+    alias: ["antidel"],
+    desc: "Toggle Antidelete for Groups and DMs",
+    category: "owner",
     filename: __filename
-}, async (conn, m, mek, { from, args, reply }) => {
-
+}, async (conn, m, mek, { from, reply, args }) => {
     if (!args[0]) {
         const status = await getAnti();
-        const path = await getPath();
-        return reply(`🗑️ *ANTIDELETE SETTINGS*
-
-Status : ${status ? "✅ ON" : "❌ OFF"}
-Path   : ${path}
-
-Usage:
-.antidelete on
-.antidelete off
-.antidelete inbox
-.antidelete chat`);
+        return reply(`📍 *Antidelete Status:* ${status ? 'ON' : 'OFF'}\nUsage: .antidelete on / off`);
     }
 
-    const option = args[0].toLowerCase();
-
-    if (option === "on") {
+    if (args[0] === "on") {
         await setAnti(true);
-        return reply("✅ AntiDelete Enabled");
-    }
-
-    if (option === "off") {
+        return reply("🛡️ *Antidelete Enabled.* (Works for Groups & DMs)");
+    } else if (args[0] === "off") {
         await setAnti(false);
-        return reply("❌ AntiDelete Disabled");
+        return reply("🔓 *Antidelete Disabled.*");
     }
+});
 
-    if (option === "inbox") {
-        await setPath("inbox");
-        return reply("📥 Deleted messages will be sent to your inbox");
-    }
-
-    if (option === "chat") {
-        await setPath("chat");
-        return reply("💬 Deleted messages will be restored in same chat");
-    }
-
-    return reply("❌ Invalid option\nUse: on / off / inbox / chat");
+// The actual listener for deletions
+cmd({
+    on: "messages.update"
+}, async (conn, updates) => {
+    await AntiDelete(conn, updates);
 });
