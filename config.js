@@ -25,7 +25,7 @@ module.exports = {
     // ==========================================
     ANTI_DELETE: process.env.ANTI_DELETE || "false",
     ANTI_DELETE_DM: process.env.ANTI_DELETE_DM || "false",
-    ANTI_DEL_PATH: process.env.ANTI_DEL_PATH || "log",
+    ANTI_DEL_PATH: process.env.ANTI_DEL_PATH || "inbox",
     ANTI_CALL: process.env.ANTI_CALL || "false",
     ANTI_VV: process.env.ANTI_VV || "true",
     ALWAYS_ONLINE: process.env.ALWAYS_ONLINE || "true",
