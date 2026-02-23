@@ -1,26 +1,38 @@
-const config = require('../config')
-const { cmd, commands } = require('../command')
-const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson} = require('../lib/functions')
+const { cmd } = require('../command')
 
 cmd({
     pattern: "lockgc",
     alias: ["lock"],
     react: "🔒",
-    desc: "Lock the group (Prevents new members from joining).",
+    desc: "Lock the group",
     category: "group",
     filename: __filename
-},           
-async (conn, mek, m, { from, isGroup, isAdmins, isBotAdmins, reply }) => {
+},
+async (conn, mek, m, { from, isGroup, sender, reply }) => {
     try {
-        if (!isGroup) return reply("❌ This command can only be used in groups.");
-        if (!isAdmins) return reply("❌ Only group admins can use this command.");
-        if (!isBotAdmins) return reply("❌ I need to be an admin to lock the group.");
+        if (!isGroup) return reply("❌ Group only command");
 
-        await conn.groupSettingUpdate(from, "locked");
-        reply("✅ Group has been locked. New members cannot join.");
+        const metadata = await conn.groupMetadata(from)
+
+        // Normalize IDs
+        const admins = metadata.participants
+            .filter(p => p.admin)
+            .map(p => p.id.split(':')[0])
+
+        const user = sender.split(':')[0]
+        const bot = conn.user.id.split(':')[0]
+
+        if (!admins.includes(user))
+            return reply("❌ Admin only command");
+
+        if (!admins.includes(bot))
+            return reply("❌ Bot must be admin");
+
+        await conn.groupSettingUpdate(from, "locked")
+
+        reply("🔒 Group locked successfully")
     } catch (e) {
-        console.error("Error locking group:", e);
-        reply("❌ Failed to lock the group. Please try again.");
+        console.log(e)
+        reply("❌ Error locking group")
     }
-});
-    
+})
