@@ -1,25 +1,37 @@
-const config = require('../config')
-const { cmd, commands } = require('../command')
-const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson} = require('../lib/functions')
+const { cmd } = require('../command')
 
 cmd({
     pattern: "unlockgc",
     alias: ["unlock"],
     react: "🔓",
-    desc: "Unlock the group (Allows new members to join).",
+    desc: "Unlock the group",
     category: "group",
     filename: __filename
-},           
-async (conn, mek, m, { from, isGroup, isAdmins, isBotAdmins, reply }) => {
+},
+async (conn, mek, m, { from, isGroup, sender, reply }) => {
     try {
-        if (!isGroup) return reply("❌ This command can only be used in groups.");
-        if (!isAdmins) return reply("❌ Only group admins can use this command.");
-        if (!isBotAdmins) return reply("❌ I need to be an admin to unlock the group.");
+        if (!isGroup) return reply("❌ Group only command");
 
-        await conn.groupSettingUpdate(from, "unlocked");
-        reply("✅ Group has been unlocked. New members can now join.");
+        const metadata = await conn.groupMetadata(from)
+
+        const admins = metadata.participants
+            .filter(p => p.admin)
+            .map(p => p.id.split(':')[0])
+
+        const user = sender.split(':')[0]
+        const bot = conn.user.id.split(':')[0]
+
+        if (!admins.includes(user))
+            return reply("❌ Admin only command");
+
+        if (!admins.includes(bot))
+            return reply("❌ Bot must be admin");
+
+        await conn.groupSettingUpdate(from, "unlocked")
+
+        reply("🔓 Group unlocked successfully")
     } catch (e) {
-        console.error("Error unlocking group:", e);
-        reply("❌ Failed to unlock the group. Please try again.");
+        console.log(e)
+        reply("❌ Error unlocking group")
     }
-});
+})
