@@ -4,7 +4,7 @@ cmd({
     pattern: "lockgc",
     alias: ["lock"],
     react: "🔒",
-    desc: "Lock the group",
+    desc: "Lock group (admins only can send messages)",
     category: "group",
     filename: __filename
 },
@@ -12,10 +12,9 @@ async (conn, mek, m, { from, isGroup, reply }) => {
     try {
         if (!isGroup) return reply("❌ Group only command");
 
-        // Directly attempt to lock (no admin checks)
-        await conn.groupSettingUpdate(from, "locked")
+        await conn.groupSettingUpdate(from, "announcement")
 
-        reply("🔒 Group locked successfully")
+        reply("🔒 Group locked (admins only can send messages)")
     } catch (e) {
         console.log(e)
         reply("❌ Failed to lock group (make sure bot is admin)")
