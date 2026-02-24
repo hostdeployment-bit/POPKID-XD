@@ -53,12 +53,13 @@ const util = require('util')
 const { sms, downloadMediaMessage, AntiDelete } = require('./lib')
 const FileType = require('file-type')
 const axios = require('axios')
-const { File } = require('megajs')
 const { fromBuffer } = require('file-type')
 const bodyparser = require('body-parser')
 const os = require('os')
 const Crypto = require('crypto')
 const path = require('path')
+const zlib = require('zlib')
+const { promisify } = require('util')
 
 const ownerNumber = ['254732297194']
 
@@ -81,17 +82,33 @@ const clearTempDir = () => {
 // Clear the temp directory every 5 minutes
 setInterval(clearTempDir, 5 * 60 * 1000)
 
-//===================SESSION-AUTH============================
-if (!fs.existsSync(__dirname + '/sessions/creds.json')) {
-  if (!config.SESSION_ID) return console.log('Please add your session to SESSION_ID env !!')
-  const sessdata = config.SESSION_ID.replace("POPKID;;;", '')
-  const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
-  filer.download((err, data) => {
-    if (err) throw err
-    fs.writeFile(__dirname + '/sessions/creds.json', data, () => {
-      console.log("[ 📥 ] Session downloaded ✅")
-    })
-  })
+//===================SESSION-AUTH (UPDATED TO POPKID~ FORMAT)============================
+const sessionDir = path.join(__dirname, 'sessions');
+const credsPath = path.join(sessionDir, 'creds.json');
+
+async function loadGiftedSession() {
+    if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+    if (fs.existsSync(credsPath)) return true;
+
+    if (config.SESSION_ID && config.SESSION_ID.startsWith("POPKID~")) {
+        const compressedBase64 = config.SESSION_ID.substring("POPKID~".length);
+        try {
+            const compressedBuffer = Buffer.from(compressedBase64, 'base64');
+            if (compressedBuffer[0] === 0x1f && compressedBuffer[1] === 0x8b) {
+                const gunzip = promisify(zlib.gunzip);
+                const decompressedBuffer = await gunzip(compressedBuffer);
+                await fs.promises.writeFile(credsPath, decompressedBuffer.toString('utf-8'));
+                console.log("[ 📥 ] Session restored from POPKID~ format ✅");
+                return true;
+            }
+        } catch (error) { 
+            console.log("❌ Failed to decompress session ID");
+            return false; 
+        }
+    } else {
+        console.log('Please add your session to SESSION_ID env !!');
+    }
+    return false;
 }
 
 const express = require("express")
@@ -104,6 +121,7 @@ let conn // ✅ GLOBAL conn declaration
 
 async function connectToWA() {
   try {
+    await loadGiftedSession();
     console.log("[ ♻ ] Connecting to WhatsApp ⏳️...")
 
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/sessions/')
@@ -210,7 +228,7 @@ function getCurrentDateTimeParts() {
 
 // Auto Bio Update Interval
 setInterval(async () => {
-    if (config.AUTO_BIO === "true") {
+    if (config.AUTO_BIO === "true" && conn) {
         const { date, time } = getCurrentDateTimeParts(); // Get separated date and time
         const bioText = `❤️ ᴘᴏᴘᴋɪᴅ xᴍᴅ ʙᴏᴛ 🤖 ɪs ʟɪᴠᴇ ɴᴏᴡ\n📅 ${date}\n⏰ ${time}`;
         try {
