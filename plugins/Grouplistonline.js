@@ -1,13 +1,10 @@
 const { cmd } = require('../command')
 
-// global store inside this plugin
-let presenceStore = {}
-
 cmd({
     pattern: "listonline",
-    alias: ["online", "onlinelist"],
+    alias: ["online"],
     react: "🟢",
-    desc: "Show online group members",
+    desc: "Show online members (maximum accuracy possible)",
     category: "group",
     filename: __filename
 },
@@ -17,60 +14,33 @@ async (conn, mek, m, { from, isGroup, reply }) => {
 
         if (!isGroup) return reply("❌ Group only command")
 
-        // initialize group store
-        if (!presenceStore[from]) {
-            presenceStore[from] = {}
-        }
-
-        // listen once safely
-        const listener = (update) => {
-
-            if (update.id === from) {
-
-                for (const user in update.presences) {
-
-                    presenceStore[from][user] =
-                        update.presences[user].lastKnownPresence
-
-                }
-
-            }
-
-        }
-
-        conn.ev.on("presence.update", listener)
-
-        // subscribe to group presence
+        // subscribe to presence
         await conn.presenceSubscribe(from)
 
-        // wait to gather presence info
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // wait longer for better accuracy
+        await new Promise(resolve => setTimeout(resolve, 3000))
 
-        // get metadata
         const metadata = await conn.groupMetadata(from)
+        const participants = metadata.participants
+
+        const presences = conn.presences?.[from] || {}
 
         let onlineUsers = []
 
-        for (const participant of metadata.participants) {
+        for (const user of Object.keys(presences)) {
 
-            const jid = participant.id
-
-            const presence = presenceStore[from][jid]
+            const presence = presences[user]?.lastKnownPresence
 
             if (
                 presence === "available" ||
                 presence === "composing" ||
                 presence === "recording"
             ) {
-                onlineUsers.push(jid)
+                onlineUsers.push(user)
             }
 
         }
 
-        // remove listener after use
-        conn.ev.off("presence.update", listener)
-
-        // build message
         let text =
             "╭───────────────◆\n" +
             "│ 🟢 ONLINE USERS\n" +
@@ -79,25 +49,25 @@ async (conn, mek, m, { from, isGroup, reply }) => {
 
         if (onlineUsers.length > 0) {
 
-            for (const user of onlineUsers) {
+            onlineUsers.forEach(user => {
                 text += `◦ @${user.split("@")[0]}\n`
-            }
+            })
 
         } else {
 
-            text += "No users currently online"
+            text += "No online users detected"
 
         }
 
-        return await conn.sendMessage(from, {
+        return conn.sendMessage(from, {
             text,
             mentions: onlineUsers
         }, { quoted: mek })
 
     }
-    catch (err) {
+    catch (e) {
 
-        console.log("ListOnline Error:", err)
+        console.log(e)
 
         return reply("❌ Failed to fetch online users")
 
