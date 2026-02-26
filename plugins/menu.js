@@ -28,26 +28,11 @@ const formatUptime = (seconds) => {
 const getSystemStats = () => {
     const total = os.totalmem();
     const free = os.freemem();
-    const used = total - free;
-    const ramPercentage = Math.floor((used / total) * 100);
-    
-    // Create the RAM bar style from the image
-    const totalBars = 10;
-    const filledBars = Math.round((ramPercentage / 100) * totalBars);
-    const ramBar = "█".repeat(filledBars) + "░".repeat(totalBars - filledBars);
-    
     return {
-        ram: `${formatSize(used)} OF ${formatSize(total)}`,
-        bar: ramBar,
-        percent: ramPercentage
+        ram: `${formatSize(total - free)}/${formatSize(total)}`,
+        cpu: os.cpus()[0]?.model || 'Unknown CPU',
+        platform: os.platform()
     };
-};
-
-const getGreeting = () => {
-    const hour = moment().tz('Africa/Nairobi').hour();
-    if (hour >= 5 && hour < 12) return "Good Morning 🌅";
-    if (hour >= 12 && hour < 18) return "Good Afternoon 🏙️";
-    return "Good Evening 🌆";
 };
 
 // =====================
@@ -63,14 +48,15 @@ cmd({
     desc: 'Show optimized main menu'
 }, async (conn, mek, m, { from, sender, pushName, reply }) => {
     try {
+
         const start = Date.now();
         const now = moment().tz('Africa/Nairobi');
 
         const date = now.format('DD/MM/YYYY');
-        const time = now.format('HH:mm:ss');
+        const uptime = formatUptime(process.uptime());
         const stats = getSystemStats();
+        const mode = config.MODE === 'public' ? 'PUBLIC' : 'PRIVATE';
         const userName = pushName || 'User';
-        const greeting = getGreeting();
 
         const commandsByCategory = {};
         let totalCommands = 0;
@@ -90,41 +76,43 @@ cmd({
 
         const sortedCategories = Object.keys(commandsByCategory).sort();
 
-        // EXACT STYLE REPLICATION FROM THE IMAGE
-        let menu = `| USAGE : ${stats.ram}
-| RAM: [${stats.bar}] ${stats.percent}%
-
-*POPKID XMD*
-  ┃
-  ┗━┓ ${greeting} 🤠
-    ┃ ─────────── ◆
-
-┝━━━━━━━━━━━━━━━⊷
-┃ 🕵️‍♂️ USER NAME: ${userName}
-┃ 📅 DATE: ${date}
-┃ ⏰ TIME: ${time}
-┃ ⭐ USERS: 4212
-┝━━━━━━━━━━━━━━━⊷
+        let menu = `╭══〘 *${config.BOT_NAME || 'POP KID-MD'}* 〙══⊷
+┃❍ *Mode:* ${mode}
+┃❍ *User:* ${userName}
+┃❍ *Plugins:* ${totalCommands}
+┃❍ *Uptime:* ${uptime}
+┃❍ *Date:* ${date}
+┃❍ *RAM:* ${stats.ram}
+┃❍ *Ping:* calculating...
+╰═════════════════⊷
 
 *Command List ⤵*`;
 
         for (const category of sortedCategories) {
+
             menu += `\n\n╭━━━━❮ *${category}* ❯━⊷\n`;
+
             const sortedCommands = [...commandsByCategory[category]].sort();
+
             for (const cmdName of sortedCommands) {
                 menu += `┃✞︎ ${config.PREFIX}${cmdName}\n`;
             }
+
             menu += `╰━━━━━━━━━━━━━━━━━⊷`;
         }
 
-        menu += `\n\n> *${config.BOT_NAME || 'POPKID XMD'}* © 2026 🇰🇪`;
+        menu += `\n\n> *${config.BOT_NAME || 'POP KID-MD'}* © 2026 🇰🇪`;
+
+        const end = Date.now();
+        const ping = end - start;
+        menu = menu.replace('calculating...', `${ping}ms`);
 
         // =====================
-        // SEND BUTTON MESSAGE
+        // SEND BUTTON MESSAGE (Same content)
         // =====================
 
         await sendButtons(conn, from, {
-            title: `🤖 ${config.BOT_NAME || 'POPKID XMD'} MENU`,
+            title: `🤖 ${config.BOT_NAME || 'POP KID-MD'} MENU`,
             text: menu,
             footer: "🚀 Powered By Popkid XMD",
             image: MENU_IMAGE_URL,
