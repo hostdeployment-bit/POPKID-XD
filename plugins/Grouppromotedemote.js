@@ -1,88 +1,53 @@
 const { cmd } = require('../command');
 
-
 // PROMOTE COMMAND
 cmd({
     pattern: "promote",
-    desc: "Promote a user to admin",
+    desc: "Promote a member to admin",
     category: "group",
     filename: __filename
-},
-async (conn, m, mek, { from, reply, isGroup, participants, quoted }) => {
-
+}, async (conn, m, mek, { from, isGroup, isAdmins, isOwner, isBotAdmins, reply }) => {
     try {
+        if (!isGroup) return reply("❌ This command is only for groups.");
+        
+        // Allow if user is Admin OR the Bot Owner
+        if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
+        
+        if (!isBotAdmins) return reply("❌ I need to be an admin to promote others.");
 
-        if (!isGroup) return reply("❌ This command only works in groups.");
-
-        // check if bot is admin
-        const groupMetadata = await conn.groupMetadata(from);
-        const botNumber = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-        const botAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;
-
-        if (!botAdmin) return reply("❌ Bot must be admin to promote.");
-
-        let user;
-
-        if (mek.message.extendedTextMessage?.contextInfo?.mentionedJid) {
-            user = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        } else if (quoted) {
-            user = quoted.sender;
-        } else {
-            return reply("❌ Mention or reply to a user to promote.");
-        }
+        let user = m.mentionedJid[0] || (m.quoted ? m.quoted.sender : null);
+        if (!user) return reply("❗ Please tag or reply to a user to promote.");
 
         await conn.groupParticipantsUpdate(from, [user], "promote");
-
-        reply(`✅ @${user.split("@")[0]} promoted to admin.`,
-            { mentions: [user] });
-
+        return await reply(`✅ @${user.split('@')[0]} has been promoted to Admin successfully.`, { mentions: [user] });
     } catch (e) {
-        console.log(e);
-        reply("❌ Failed to promote user.");
+        console.error(e);
+        reply("❌ Error: Could not complete promotion.");
     }
-
 });
-
-
 
 // DEMOTE COMMAND
 cmd({
     pattern: "demote",
-    desc: "Demote an admin",
+    desc: "Demote an admin to member",
     category: "group",
     filename: __filename
-},
-async (conn, m, mek, { from, reply, isGroup, participants, quoted }) => {
-
+}, async (conn, m, mek, { from, isGroup, isAdmins, isOwner, isBotAdmins, reply }) => {
     try {
+        if (!isGroup) return reply("❌ This command is only for groups.");
+        
+        // Accurate Check: If the sender is NOT an admin AND NOT the owner, block them
+        if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
+        
+        if (!isBotAdmins) return reply("❌ I need to be an admin to demote others.");
 
-        if (!isGroup) return reply("❌ This command only works in groups.");
-
-        // check if bot is admin
-        const groupMetadata = await conn.groupMetadata(from);
-        const botNumber = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-        const botAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;
-
-        if (!botAdmin) return reply("❌ Bot must be admin to demote.");
-
-        let user;
-
-        if (mek.message.extendedTextMessage?.contextInfo?.mentionedJid) {
-            user = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        } else if (quoted) {
-            user = quoted.sender;
-        } else {
-            return reply("❌ Mention or reply to a user to demote.");
-        }
+        let user = m.mentionedJid[0] || (m.quoted ? m.quoted.sender : null);
+        if (!user) return reply("❗ Please tag or reply to an admin to demote.");
 
         await conn.groupParticipantsUpdate(from, [user], "demote");
-
-        reply(`✅ @${user.split("@")[0]} demoted from admin.`,
-            { mentions: [user] });
-
+        return await reply(`📉 @${user.split('@')[0]} is no longer an Admin.`, { mentions: [user] });
     } catch (e) {
-        console.log(e);
-        reply("❌ Failed to demote user.");
+        console.error(e);
+        reply("❌ Error: Could not complete demotion.");
     }
-
 });
