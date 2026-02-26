@@ -1,23 +1,23 @@
 const { cmd } = require('../command');
+const config = require('../config'); // Make sure you have NEWSLETTER_JID and OWNER_NAME
 
 cmd({
     pattern: "tagall",
     alias: ["everyone", "all"],
-    desc: "Mention all members with a stylish header",
+    desc: "Mention all members with a stylish header and forwarded newsletter style",
     category: "group",
     filename: __filename
-}, async (conn, mek, m, { from, isGroup, args, q, reply, botFooter }) => {
+}, async (conn, mek, m, { from, isGroup, args, q, reply, botFooter, sender }) => {
     try {
-        // 1. Group check
         if (!isGroup) return reply("❌ *Popkid, this command only works in groups!*");
 
         await conn.sendMessage(from, { react: { text: "📣", key: mek.key } });
 
-        // 2. Fetch all group participants
+        // Fetch group participants
         const groupMetadata = await conn.groupMetadata(from);
         const participants = groupMetadata.participants;
-        
-        // 3. Prepare Stylish Caption
+
+        // Build mentions and TagAll message
         let mentions = [];
         let tagMessage = `
 ╔═══════════════════╗
@@ -32,7 +32,6 @@ cmd({
 ┌───⊷ *𝐆𝐑𝐎𝐔𝐏 𝐌𝐄𝐌𝐁𝐄𝐑𝐒*
 `;
 
-        // 4. Build the mention list with fancy bullets
         for (let participant of participants) {
             tagMessage += `│🔹 @${participant.id.split('@')[0]}\n`;
             mentions.push(participant.id);
@@ -42,12 +41,25 @@ cmd({
 
 > *𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐛𝐲 𝐏𝐨𝐩𝐤𝐢𝐝🇰🇪*`;
 
-        // 5. Send Image with Stylish Caption
+        // Forwarded newsletter style context info
+        const newsletterContextInfo = {
+            mentionedJid: mentions.concat(sender),
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
+                newsletterName: config.OWNER_NAME || 'POPKID',
+                serverMessageId: 1 // optional: can be any number
+            }
+        };
+
+        // Send TagAll message with newsletter style
         await conn.sendMessage(from, { 
             image: { url: 'https://files.catbox.moe/aapw1p.png' }, 
             caption: tagMessage, 
             mentions: mentions,
-            footer: botFooter || 'ᴘᴏᴘᴋɪᴅ ᴀɪ ᴋᴇɴʏᴀ 🇰🇪'
+            footer: botFooter || 'ᴘᴏᴘᴋɪᴅ ᴀɪ ᴋᴇɴʏᴀ 🇰🇪',
+            contextInfo: newsletterContextInfo
         }, { quoted: mek });
 
     } catch (err) {
