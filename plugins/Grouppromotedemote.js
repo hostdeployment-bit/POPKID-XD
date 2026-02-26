@@ -1,95 +1,105 @@
 const config = require('../config');
 const { cmd } = require('../command');
 
+// helper to get admin list
+async function getGroupAdmins(conn, groupId) {
+    const metadata = await conn.groupMetadata(groupId);
+    return metadata.participants
+        .filter(p => p.admin !== null)
+        .map(p => p.id);
+}
+
 // ================================
-// PROMOTE COMMAND
+// PROMOTE
 // ================================
 
 cmd({
     pattern: "promote",
-    desc: "Promote a member to admin",
+    desc: "Promote user to admin",
     category: "group",
     react: "⬆️",
     filename: __filename
 },
-async (conn, mek, m, { from, sender, isGroup, isAdmins, isBotAdmins, mentionedJid, reply }) => {
+async (conn, mek, m, { from, sender, isGroup, mentionedJid, reply }) => {
 
 try {
 
 if (!isGroup)
-return reply("❌ This command can only be used in groups.");
+return reply("❌ This command is for groups only.");
 
-if (!isAdmins)
-return reply("❌ Only group admins can use this command.");
+const groupAdmins = await getGroupAdmins(conn, from);
+const botNumber = conn.user.id.split(":")[0] + "@s.whatsapp.net";
 
-if (!isBotAdmins)
-return reply("❌ I must be admin to promote members.");
+const isAdmin = groupAdmins.includes(sender);
+const isBotAdmin = groupAdmins.includes(botNumber);
 
-let users = mentionedJid && mentionedJid[0]
-? mentionedJid
-: mek.message?.extendedTextMessage?.contextInfo?.participant
-? [mek.message.extendedTextMessage.contextInfo.participant]
-: [];
+if (!isAdmin)
+return reply("❌ You must be an admin.");
 
-if (users.length === 0)
-return reply("❌ Tag or reply to a user to promote.");
+if (!isBotAdmin)
+return reply("❌ I must be admin first.");
 
-await conn.groupParticipantsUpdate(from, users, "promote");
+let target = mentionedJid[0] 
+|| mek.message?.extendedTextMessage?.contextInfo?.participant;
 
-reply("✅ User promoted to admin successfully.");
+if (!target)
+return reply("❌ Tag or reply to a user.");
 
-} catch (e) {
+await conn.groupParticipantsUpdate(from, [target], "promote");
 
-console.log(e);
-reply("❌ Failed to promote user.");
+reply("✅ Successfully promoted to admin.");
 
+} catch (err) {
+console.log(err);
+reply("❌ Error promoting user.");
 }
 
 });
 
 
 // ================================
-// DEMOTE COMMAND
+// DEMOTE
 // ================================
 
 cmd({
     pattern: "demote",
-    desc: "Demote an admin to member",
+    desc: "Demote admin to member",
     category: "group",
     react: "⬇️",
     filename: __filename
 },
-async (conn, mek, m, { from, sender, isGroup, isAdmins, isBotAdmins, mentionedJid, reply }) => {
+async (conn, mek, m, { from, sender, isGroup, mentionedJid, reply }) => {
 
 try {
 
 if (!isGroup)
-return reply("❌ This command can only be used in groups.");
+return reply("❌ This command is for groups only.");
 
-if (!isAdmins)
-return reply("❌ Only group admins can use this command.");
+const groupAdmins = await getGroupAdmins(conn, from);
+const botNumber = conn.user.id.split(":")[0] + "@s.whatsapp.net";
 
-if (!isBotAdmins)
-return reply("❌ I must be admin to demote members.");
+const isAdmin = groupAdmins.includes(sender);
+const isBotAdmin = groupAdmins.includes(botNumber);
 
-let users = mentionedJid && mentionedJid[0]
-? mentionedJid
-: mek.message?.extendedTextMessage?.contextInfo?.participant
-? [mek.message.extendedTextMessage.contextInfo.participant]
-: [];
+if (!isAdmin)
+return reply("❌ You must be an admin.");
 
-if (users.length === 0)
-return reply("❌ Tag or reply to a user to demote.");
+if (!isBotAdmin)
+return reply("❌ I must be admin first.");
 
-await conn.groupParticipantsUpdate(from, users, "demote");
+let target = mentionedJid[0] 
+|| mek.message?.extendedTextMessage?.contextInfo?.participant;
 
-reply("✅ User demoted successfully.");
+if (!target)
+return reply("❌ Tag or reply to a user.");
 
-} catch (e) {
+await conn.groupParticipantsUpdate(from, [target], "demote");
 
-console.log(e);
-reply("❌ Failed to demote user.");
+reply("✅ Successfully demoted.");
 
+} catch (err) {
+console.log(err);
+reply("❌ Error demoting user.");
 }
 
 });
