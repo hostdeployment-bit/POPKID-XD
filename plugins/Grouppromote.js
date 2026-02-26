@@ -1,82 +1,32 @@
-const { cmd } = require('../command');
+const { cmd } = require('../command')
 
-
-// PROMOTE
 cmd({
     pattern: "promote",
-    desc: "Promote user",
+    alias: ["addadmin"],
+    react: "⬆️",
+    desc: "Promote a member to admin",
     category: "group",
     filename: __filename
 },
-async (conn, m, mek, { from, reply, isGroup, quoted }) => {
-
+async (conn, mek, m, { from, isGroup, reply, quoted }) => {
     try {
+        if (!isGroup) return reply("❌ Group only command")
 
-        if (!isGroup) return reply("❌ Group only command.");
+        let user
 
-        let user;
-
-        // get mentioned user
-        if (mek.message.extendedTextMessage?.contextInfo?.mentionedJid) {
-            user = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        }
-        // get replied user
-        else if (quoted) {
-            user = quoted.sender;
-        }
-        else {
-            return reply("❌ Reply or mention user.");
+        if (m.mentionedJid && m.mentionedJid[0]) {
+            user = m.mentionedJid[0]
+        } else if (quoted) {
+            user = quoted.sender
+        } else {
+            return reply("❌ Reply to a user or mention a user to promote")
         }
 
-        await conn.groupParticipantsUpdate(from, [user], "promote");
+        await conn.groupParticipantsUpdate(from, [user], "promote")
 
-        reply(`✅ Successfully promoted @${user.split("@")[0]}`, {
-            mentions: [user]
-        });
-
-    } catch (err) {
-        console.log(err);
-        reply("❌ Error promoting user.");
+        reply("✅ User promoted to admin successfully")
+    } catch (e) {
+        console.log(e)
+        reply("❌ Failed to promote user (make sure bot is admin)")
     }
-
-});
-
-
-
-// DEMOTE
-cmd({
-    pattern: "demote",
-    desc: "Demote user",
-    category: "group",
-    filename: __filename
-},
-async (conn, m, mek, { from, reply, isGroup, quoted }) => {
-
-    try {
-
-        if (!isGroup) return reply("❌ Group only command.");
-
-        let user;
-
-        if (mek.message.extendedTextMessage?.contextInfo?.mentionedJid) {
-            user = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        }
-        else if (quoted) {
-            user = quoted.sender;
-        }
-        else {
-            return reply("❌ Reply or mention user.");
-        }
-
-        await conn.groupParticipantsUpdate(from, [user], "demote");
-
-        reply(`✅ Successfully demoted @${user.split("@")[0]}`, {
-            mentions: [user]
-        });
-
-    } catch (err) {
-        console.log(err);
-        reply("❌ Error demoting user.");
-    }
-
-});
+})
