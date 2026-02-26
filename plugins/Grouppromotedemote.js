@@ -1,105 +1,88 @@
-const config = require('../config');
 const { cmd } = require('../command');
 
-// helper to get admin list
-async function getGroupAdmins(conn, groupId) {
-    const metadata = await conn.groupMetadata(groupId);
-    return metadata.participants
-        .filter(p => p.admin !== null)
-        .map(p => p.id);
-}
 
-// ================================
-// PROMOTE
-// ================================
-
+// PROMOTE COMMAND
 cmd({
     pattern: "promote",
-    desc: "Promote user to admin",
+    desc: "Promote a user to admin",
     category: "group",
-    react: "⬆️",
     filename: __filename
 },
-async (conn, mek, m, { from, sender, isGroup, mentionedJid, reply }) => {
+async (conn, m, mek, { from, reply, isGroup, participants, quoted }) => {
 
-try {
+    try {
 
-if (!isGroup)
-return reply("❌ This command is for groups only.");
+        if (!isGroup) return reply("❌ This command only works in groups.");
 
-const groupAdmins = await getGroupAdmins(conn, from);
-const botNumber = conn.user.id.split(":")[0] + "@s.whatsapp.net";
+        // check if bot is admin
+        const groupMetadata = await conn.groupMetadata(from);
+        const botNumber = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+        const botAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;
 
-const isAdmin = groupAdmins.includes(sender);
-const isBotAdmin = groupAdmins.includes(botNumber);
+        if (!botAdmin) return reply("❌ Bot must be admin to promote.");
 
-if (!isAdmin)
-return reply("❌ You must be an admin.");
+        let user;
 
-if (!isBotAdmin)
-return reply("❌ I must be admin first.");
+        if (mek.message.extendedTextMessage?.contextInfo?.mentionedJid) {
+            user = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
+        } else if (quoted) {
+            user = quoted.sender;
+        } else {
+            return reply("❌ Mention or reply to a user to promote.");
+        }
 
-let target = mentionedJid[0] 
-|| mek.message?.extendedTextMessage?.contextInfo?.participant;
+        await conn.groupParticipantsUpdate(from, [user], "promote");
 
-if (!target)
-return reply("❌ Tag or reply to a user.");
+        reply(`✅ @${user.split("@")[0]} promoted to admin.`,
+            { mentions: [user] });
 
-await conn.groupParticipantsUpdate(from, [target], "promote");
-
-reply("✅ Successfully promoted to admin.");
-
-} catch (err) {
-console.log(err);
-reply("❌ Error promoting user.");
-}
+    } catch (e) {
+        console.log(e);
+        reply("❌ Failed to promote user.");
+    }
 
 });
 
 
-// ================================
-// DEMOTE
-// ================================
 
+// DEMOTE COMMAND
 cmd({
     pattern: "demote",
-    desc: "Demote admin to member",
+    desc: "Demote an admin",
     category: "group",
-    react: "⬇️",
     filename: __filename
 },
-async (conn, mek, m, { from, sender, isGroup, mentionedJid, reply }) => {
+async (conn, m, mek, { from, reply, isGroup, participants, quoted }) => {
 
-try {
+    try {
 
-if (!isGroup)
-return reply("❌ This command is for groups only.");
+        if (!isGroup) return reply("❌ This command only works in groups.");
 
-const groupAdmins = await getGroupAdmins(conn, from);
-const botNumber = conn.user.id.split(":")[0] + "@s.whatsapp.net";
+        // check if bot is admin
+        const groupMetadata = await conn.groupMetadata(from);
+        const botNumber = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+        const botAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;
 
-const isAdmin = groupAdmins.includes(sender);
-const isBotAdmin = groupAdmins.includes(botNumber);
+        if (!botAdmin) return reply("❌ Bot must be admin to demote.");
 
-if (!isAdmin)
-return reply("❌ You must be an admin.");
+        let user;
 
-if (!isBotAdmin)
-return reply("❌ I must be admin first.");
+        if (mek.message.extendedTextMessage?.contextInfo?.mentionedJid) {
+            user = mek.message.extendedTextMessage.contextInfo.mentionedJid[0];
+        } else if (quoted) {
+            user = quoted.sender;
+        } else {
+            return reply("❌ Mention or reply to a user to demote.");
+        }
 
-let target = mentionedJid[0] 
-|| mek.message?.extendedTextMessage?.contextInfo?.participant;
+        await conn.groupParticipantsUpdate(from, [user], "demote");
 
-if (!target)
-return reply("❌ Tag or reply to a user.");
+        reply(`✅ @${user.split("@")[0]} demoted from admin.`,
+            { mentions: [user] });
 
-await conn.groupParticipantsUpdate(from, [target], "demote");
-
-reply("✅ Successfully demoted.");
-
-} catch (err) {
-console.log(err);
-reply("❌ Error demoting user.");
-}
+    } catch (e) {
+        console.log(e);
+        reply("❌ Failed to demote user.");
+    }
 
 });
