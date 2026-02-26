@@ -9,13 +9,13 @@ const MENU_IMAGE_URL = "https://files.catbox.moe/aapw1p.png";
 // =====================
 
 const getGreeting = () => {
-    const hour = moment().tz('Africa/Nairobi').hour();  
+    const hour = moment().tz('Africa/Nairobi').hour();
 
-    if (hour >= 5 && hour < 12)  
-        return "🌅 Good Morning";  
+    if (hour >= 5 && hour < 12)
+        return "🌅 Good Morning";
 
-    if (hour >= 12 && hour < 18)  
-        return "🌤️ Good Afternoon";  
+    if (hour >= 12 && hour < 18)
+        return "🌤️ Good Afternoon";
 
     return "🌙 Good Night";
 };
@@ -52,7 +52,6 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
         // =====================
         // Organize Commands
         // =====================
-
         const commandsByCategory = {};
         commands
             .filter(cmd => cmd.pattern && !cmd.dontAdd && cmd.category)
@@ -69,31 +68,28 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
         // =====================
         // HEADER
         // =====================
-
         let menu = `
-┌─❖
-│POPKID XMD
-└┬❖
-│${greeting} 😴
-└────────┈❖
+*┌─❖*
+*│POPKID XMD*
+*└┬❖*
+   *│${greeting} 😴*
+   *└────────┈❖*
 ▬▬▬▬▬▬▬▬▬▬
-
 > 🕵️ᴜsᴇʀ ɴᴀᴍᴇ: ${userName}
-📅ᴅᴀᴛᴇ: ${date}
-⏰ᴛɪᴍᴇ: ${time}
-⭐ᴜsᴇʀs: ${commands.length}
+> 📅ᴅᴀᴛᴇ: ${date}
+> ⏰ᴛɪᴍᴇ: ${time}
+> ⭐ᴜsᴇʀs: ${commands.length}
 ▬▬▬▬▬▬▬▬▬▬
 `;
 
         // =====================
         // COMMAND LIST
         // =====================
-
         for (const category of sortedCategories) {
             menu += `\n*╭─❖ ${category} MENU ❖*\n`;
             const sortedCommands = commandsByCategory[category].sort();
             for (const cmdName of sortedCommands) {
-                menu += `*│➤ ${config.PREFIX}${cmdName}*\n`;
+                menu += `*│❍⁠⁠ ${config.PREFIX}${cmdName}*\n`;
             }
             menu += `*╰──────────────❖*\n`;
         }
@@ -101,7 +97,11 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
         // =====================
         // FOOTER
         // =====================
-        menu += `*┌─❖* *│POPKID XMD BOT* *└──────────────❖*`;
+        menu += `
+*┌─❖*
+*│POPKID XMD BOT*
+*└──────────────❖*
+`;
 
         // =====================
         // CONTEXT INFO (FORWARDED NEWSLETTER STYLE)
@@ -138,4 +138,5 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
         console.log(e);
         reply("❌ Error loading menu.");
     }
+
 });
