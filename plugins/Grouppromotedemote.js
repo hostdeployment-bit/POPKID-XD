@@ -1,53 +1,60 @@
 const { cmd } = require('../command');
 
-// PROMOTE COMMAND
+// FORCE PROMOTE
 cmd({
     pattern: "promote",
-    desc: "Promote a member to admin",
+    desc: "Promote a member to admin (Direct)",
     category: "group",
     filename: __filename
-}, async (conn, m, mek, { from, isGroup, isAdmins, isOwner, isBotAdmins, reply }) => {
+}, async (conn, m, mek, { from, isGroup, isBotAdmins, reply }) => {
     try {
-        if (!isGroup) return reply("❌ This command is only for groups.");
+        if (!isGroup) return reply("❌ This is for groups only.");
         
-        // Allow if user is Admin OR the Bot Owner
-        if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
-        
-        if (!isBotAdmins) return reply("❌ I need to be an admin to promote others.");
+        // We only check if the BOT is admin, because it physically needs it to work.
+        if (!isBotAdmins) return reply("❌ I must be admin to promote others.");
 
         let user = m.mentionedJid[0] || (m.quoted ? m.quoted.sender : null);
-        if (!user) return reply("❗ Please tag or reply to a user to promote.");
+        if (!user) return reply("❗ Please tag or reply to a user.");
 
+        // Direct action without checking the sender's rank
         await conn.groupParticipantsUpdate(from, [user], "promote");
-        return await reply(`✅ @${user.split('@')[0]} has been promoted to Admin successfully.`, { mentions: [user] });
+        
+        return await conn.sendMessage(from, { 
+            text: `✅ Action Successful: @${user.split('@')[0]} promoted.`, 
+            mentions: [user] 
+        }, { quoted: mek });
+
     } catch (e) {
+        // If it fails (e.g., if you weren't actually allowed), it fails silently or with a simple error.
         console.error(e);
-        reply("❌ Error: Could not complete promotion.");
+        reply("❌ Action failed. Ensure I have the correct permissions.");
     }
 });
 
-// DEMOTE COMMAND
+// FORCE DEMOTE
 cmd({
     pattern: "demote",
-    desc: "Demote an admin to member",
+    desc: "Demote an admin to member (Direct)",
     category: "group",
     filename: __filename
-}, async (conn, m, mek, { from, isGroup, isAdmins, isOwner, isBotAdmins, reply }) => {
+}, async (conn, m, mek, { from, isGroup, isBotAdmins, reply }) => {
     try {
-        if (!isGroup) return reply("❌ This command is only for groups.");
-        
-        // Accurate Check: If the sender is NOT an admin AND NOT the owner, block them
-        if (!isAdmins && !isOwner) return reply("❌ Only group admins can use this command.");
-        
-        if (!isBotAdmins) return reply("❌ I need to be an admin to demote others.");
+        if (!isGroup) return reply("❌ This is for groups only.");
+        if (!isBotAdmins) return reply("❌ I must be admin to demote others.");
 
         let user = m.mentionedJid[0] || (m.quoted ? m.quoted.sender : null);
-        if (!user) return reply("❗ Please tag or reply to an admin to demote.");
+        if (!user) return reply("❗ Please tag or reply to an admin.");
 
+        // Direct action
         await conn.groupParticipantsUpdate(from, [user], "demote");
-        return await reply(`📉 @${user.split('@')[0]} is no longer an Admin.`, { mentions: [user] });
+
+        return await conn.sendMessage(from, { 
+            text: `📉 Action Successful: @${user.split('@')[0]} demoted.`, 
+            mentions: [user] 
+        }, { quoted: mek });
+
     } catch (e) {
         console.error(e);
-        reply("❌ Error: Could not complete demotion.");
+        reply("❌ Action failed.");
     }
 });
