@@ -19,14 +19,15 @@ async (conn, mek, m, { from, isGroup, reply, quoted }) => {
         } else if (quoted) {
             user = quoted.sender
         } else {
-            return reply("❌ Reply to a user or mention a user to promote")
+            return reply("❌ Reply or mention a user to promote")
         }
 
         await conn.groupParticipantsUpdate(from, [user], "promote")
 
-        reply("✅ User promoted to admin successfully")
+        return reply("✅ User promoted to admin successfully")
+
     } catch (e) {
-        console.log(e)
-        reply("❌ Failed to promote user (make sure bot is admin)")
+        console.log("Promote Error:", e)
+        return reply("❌ Failed to promote user (make sure bot is admin)")
     }
 })
