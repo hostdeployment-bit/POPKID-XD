@@ -1,28 +1,35 @@
 const { cmd } = require('../command');
+const config = require('../config'); // Make sure you have NEWSLETTER_JID and OWNER_NAME in config
 
 cmd({
     pattern: "ping",
-    desc: "Check bot speed and forward newsletter",
+    desc: "Check bot speed and forward newsletter in style",
     category: "main",
     filename: __filename
-}, async (conn, m, mek, { from, reply }) => {
+}, async (conn, m, mek, { from, sender, reply }) => {
     try {
         const start = Date.now();
         await conn.sendMessage(from, { react: { text: "📍", key: mek.key } });
         const end = Date.now();
         const speedMessage = `🚀 *Pong:* ${end - start}ms`;
 
-        // Send ping message first
-        await reply(speedMessage);
+        // Context info for forwarded newsletter style
+        const newsletterContextInfo = {
+            mentionedJid: [sender],
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
+                newsletterName: config.OWNER_NAME || 'POPKID',
+                serverMessageId: 1 // You can set this as needed
+            }
+        };
 
-        // Forward latest newsletter
-        const newsletterJid = '120363423997837331@newsletter';
-        const newsletterMessages = await conn.fetchMessages(newsletterJid, { limit: 1 });
-
-        if (newsletterMessages && newsletterMessages.messages && newsletterMessages.messages[0]) {
-            const latestNewsletter = newsletterMessages.messages[0];
-            await conn.sendMessage(from, { forward: latestNewsletter, forceForward: true });
-        }
+        // Send ping message with newsletter style context
+        await conn.sendMessage(from, { 
+            text: speedMessage, 
+            contextInfo: newsletterContextInfo 
+        }, { quoted: mek });
 
     } catch (err) {
         console.error("PING ERROR:", err);
