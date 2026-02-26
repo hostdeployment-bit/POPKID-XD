@@ -1,5 +1,4 @@
 const config = require('../config');
-const os = require('os');
 const moment = require('moment-timezone');
 const { cmd, commands } = require('../command');
 
@@ -35,7 +34,7 @@ cmd({
     desc: "Show bot menu",
     filename: __filename
 },
-async (conn, mek, m, { from, pushName, reply }) => {
+async (conn, mek, m, { from, sender, pushName, reply }) => {
 
 try {
 
@@ -44,7 +43,12 @@ const now = moment().tz("Africa/Nairobi");
 const date = now.format("DD/MM/YYYY");
 const time = now.format("HH:mm:ss");
 
-const userName = pushName || "User";
+// FIX USERNAME (real WhatsApp name)
+let userName =
+pushName ||
+mek.pushName ||
+conn.getName(sender) ||
+"Unknown";
 
 const greeting = getGreeting();
 
@@ -72,7 +76,7 @@ commandsByCategory[category].push(name);
 const sortedCategories = Object.keys(commandsByCategory).sort();
 
 // =====================
-// HEADER (EXACT STYLE)
+// HEADER
 // =====================
 
 let menu = `
@@ -120,7 +124,7 @@ menu += `
 `;
 
 // =====================
-// SEND MENU
+// SEND MENU (FIXED NO DOUBLE IMAGE)
 // =====================
 
 await conn.sendMessage(from, {
@@ -135,15 +139,11 @@ externalAdReply: {
 
 title: "POPKID XMD",
 
-body: "Advanced WhatsApp Bot",
-
-thumbnailUrl: MENU_IMAGE_URL,
-
-sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T",
+body: userName,
 
 mediaType: 1,
 
-renderLargerThumbnail: true
+renderLargerThumbnail: false // IMPORTANT FIX
 
 }
 
