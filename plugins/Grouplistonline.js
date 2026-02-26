@@ -1,13 +1,13 @@
 const { cmd } = require('../command')
 
-// temporary presence store (standalone)
-const presenceStore = {}
+// global store inside this plugin
+let presenceStore = {}
 
 cmd({
     pattern: "listonline",
     alias: ["online", "onlinelist"],
     react: "🟢",
-    desc: "Show currently online group members",
+    desc: "Show online group members",
     category: "group",
     filename: __filename
 },
@@ -15,97 +15,89 @@ async (conn, mek, m, { from, isGroup, reply }) => {
 
     try {
 
-        if (!isGroup) {
-            return reply("❌ Group only command")
-        }
+        if (!isGroup) return reply("❌ Group only command")
 
-        // initialize store for this group
+        // initialize group store
         if (!presenceStore[from]) {
             presenceStore[from] = {}
         }
 
-        // listen for presence updates (standalone)
-        conn.ev.on("presence.update", (update) => {
+        // listen once safely
+        const listener = (update) => {
 
             if (update.id === from) {
 
-                for (let user in update.presences) {
+                for (const user in update.presences) {
 
-                    presenceStore[from][user] = update.presences[user]
+                    presenceStore[from][user] =
+                        update.presences[user].lastKnownPresence
 
                 }
 
             }
 
-        })
+        }
 
-        // subscribe to presence
+        conn.ev.on("presence.update", listener)
+
+        // subscribe to group presence
         await conn.presenceSubscribe(from)
 
-        // wait to collect presence data
-        await new Promise(resolve => setTimeout(resolve, 1500))
+        // wait to gather presence info
+        await new Promise(resolve => setTimeout(resolve, 2000))
 
-        // get group metadata
+        // get metadata
         const metadata = await conn.groupMetadata(from)
-        const participants = metadata.participants
 
         let onlineUsers = []
 
-        for (let member of participants) {
+        for (const participant of metadata.participants) {
 
-            const jid = member.id
-            const presenceData = presenceStore[from][jid]
+            const jid = participant.id
 
-            if (presenceData) {
+            const presence = presenceStore[from][jid]
 
-                const state = presenceData.lastKnownPresence
-
-                if (
-                    state === "available" ||
-                    state === "composing" ||
-                    state === "recording"
-                ) {
-                    onlineUsers.push(jid)
-                }
-
+            if (
+                presence === "available" ||
+                presence === "composing" ||
+                presence === "recording"
+            ) {
+                onlineUsers.push(jid)
             }
 
         }
 
-        // no users
-        if (onlineUsers.length === 0) {
+        // remove listener after use
+        conn.ev.off("presence.update", listener)
 
-            return reply(
-                "╭───────────────◆\n" +
-                "│ 🟢 ONLINE USERS\n" +
-                "│ 👥 Total: 0\n" +
-                "╰───────────────◆"
-            )
-
-        }
-
-        // build result
-        let message =
+        // build message
+        let text =
             "╭───────────────◆\n" +
             "│ 🟢 ONLINE USERS\n" +
             `│ 👥 Total: ${onlineUsers.length}\n` +
             "╰───────────────◆\n\n"
 
-        for (let user of onlineUsers) {
+        if (onlineUsers.length > 0) {
 
-            message += `◦ @${user.split("@")[0]}\n`
+            for (const user of onlineUsers) {
+                text += `◦ @${user.split("@")[0]}\n`
+            }
+
+        } else {
+
+            text += "No users currently online"
 
         }
 
-        await conn.sendMessage(from, {
-            text: message,
+        return await conn.sendMessage(from, {
+            text,
             mentions: onlineUsers
         }, { quoted: mek })
 
     }
-    catch (error) {
+    catch (err) {
 
-        console.log("ListOnline Error:", error)
+        console.log("ListOnline Error:", err)
 
         return reply("❌ Failed to fetch online users")
 
