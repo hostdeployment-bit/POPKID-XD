@@ -2,7 +2,6 @@ const config = require('../config');
 const os = require('os');
 const moment = require('moment-timezone');
 const { cmd, commands } = require('../command');
-const { sendButtons } = require('gifted-btns');
 
 const MENU_IMAGE_URL = "https://files.catbox.moe/aapw1p.png";
 
@@ -10,28 +9,32 @@ const MENU_IMAGE_URL = "https://files.catbox.moe/aapw1p.png";
 // Helpers
 // =====================
 
+const getGreeting = () => {
+    const hour = moment().tz('Africa/Nairobi').hour();
+    if (hour >= 5 && hour < 12) return "Good Morning 🌅";
+    if (hour >= 12 && hour < 18) return "Good Afternoon 🏙️";
+    return "Good Evening 🌆";
+};
+
 const formatSize = (bytes) => {
     if (!bytes || isNaN(bytes)) return '0MB';
     if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + 'GB';
     return (bytes / 1048576).toFixed(2) + 'MB';
 };
 
-const formatUptime = (seconds) => {
-    seconds = Number(seconds);
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor(seconds % 86400 / 3600);
-    const m = Math.floor(seconds % 3600 / 60);
-    const s = Math.floor(seconds % 60);
-    return `${d}d ${h}h ${m}m ${s}s`;
-};
-
 const getSystemStats = () => {
     const total = os.totalmem();
     const free = os.freemem();
+    const used = total - free;
+    const ramPercentage = Math.floor((used / total) * 100);
+    const totalBars = 10;
+    const filledBars = Math.round((ramPercentage / 100) * totalBars);
+    const ramBar = "█".repeat(filledBars) + "░".repeat(totalBars - filledBars);
+    
     return {
-        ram: `${formatSize(total - free)}/${formatSize(total)}`,
-        cpu: os.cpus()[0]?.model || 'Unknown CPU',
-        platform: os.platform()
+        usage: `${formatSize(used)} OF ${formatSize(total)}`,
+        bar: ramBar,
+        percent: ramPercentage
     };
 };
 
@@ -42,90 +45,79 @@ const getSystemStats = () => {
 cmd({
     pattern: 'menu',
     alias: ['help', 'allmenu'],
-    react: '✅',
+    react: '✨',
     category: 'main',
     filename: __filename,
     desc: 'Show optimized main menu'
-}, async (conn, mek, m, { from, sender, pushName, reply }) => {
+}, async (conn, mek, m, { from, pushName, reply }) => {
     try {
-
         const start = Date.now();
         const now = moment().tz('Africa/Nairobi');
-
         const date = now.format('DD/MM/YYYY');
-        const uptime = formatUptime(process.uptime());
+        const time = now.format('HH:mm:ss');
         const stats = getSystemStats();
-        const mode = config.MODE === 'public' ? 'PUBLIC' : 'PRIVATE';
         const userName = pushName || 'User';
+        const greeting = getGreeting();
 
         const commandsByCategory = {};
-        let totalCommands = 0;
-
-        commands
-            .filter(cmd => cmd.pattern && !cmd.dontAdd && cmd.category)
-            .forEach(cmd => {
-                const category = cmd.category.toUpperCase().trim();
-                const name = cmd.pattern.split('|')[0].trim();
-
-                if (!commandsByCategory[category])
-                    commandsByCategory[category] = new Set();
-
-                commandsByCategory[category].add(name);
-                totalCommands++;
-            });
+        commands.filter(cmd => cmd.pattern && !cmd.dontAdd && cmd.category).forEach(cmd => {
+            const category = cmd.category.toUpperCase().trim();
+            const name = cmd.pattern.split('|')[0].trim();
+            if (!commandsByCategory[category]) commandsByCategory[category] = new Set();
+            commandsByCategory[category].add(name);
+        });
 
         const sortedCategories = Object.keys(commandsByCategory).sort();
+        const end = Date.now();
+        const ping = end - start;
 
-        let menu = `╭══〘 *${config.BOT_NAME || 'POP KID-MD'}* 〙══⊷
-┃❍ *Mode:* ${mode}
-┃❍ *User:* ${userName}
-┃❍ *Plugins:* ${totalCommands}
-┃❍ *Uptime:* ${uptime}
-┃❍ *Date:* ${date}
-┃❍ *RAM:* ${stats.ram}
-┃❍ *Ping:* calculating...
-╰═════════════════⊷
+        // EXACT STYLE REPLICATION FROM IMAGE
+        let menu = `| USAGE : ${stats.usage}
+| RAM: [${stats.bar}] ${stats.percent}%
+| PING: ${ping}ms
+
+**POPKID XMD**
+  ┃
+  ┗━┓ 🏙️ **${greeting}** 🤠
+    ┃ ─────────── ◆
+
+┝━━━━━━━━━━━━━━━⊷
+┃ 🕵️‍♂️ USER NAME: ${userName}
+┃ 📅 DATE: ${date}
+┃ ⏰ TIME: ${time}
+┃ ⭐ USERS: 4212
+┝━━━━━━━━━━━━━━━⊷
 
 *Command List ⤵*`;
 
         for (const category of sortedCategories) {
-
             menu += `\n\n╭━━━━❮ *${category}* ❯━⊷\n`;
-
             const sortedCommands = [...commandsByCategory[category]].sort();
-
             for (const cmdName of sortedCommands) {
                 menu += `┃✞︎ ${config.PREFIX}${cmdName}\n`;
             }
-
             menu += `╰━━━━━━━━━━━━━━━━━⊷`;
         }
 
-        menu += `\n\n> *${config.BOT_NAME || 'POP KID-MD'}* © 2026 🇰🇪`;
-
-        const end = Date.now();
-        const ping = end - start;
-        menu = menu.replace('calculating...', `${ping}ms`);
+        menu += `\n\n> *POPKID XMD* © 2026 🇰🇪`;
 
         // =====================
-        // SEND BUTTON MESSAGE (Same content)
+        // SEND MESSAGE (Using standard send method like .ping)
         // =====================
-
-        await sendButtons(conn, from, {
-            title: `🤖 ${config.BOT_NAME || 'POP KID-MD'} MENU`,
-            text: menu,
-            footer: "🚀 Powered By Popkid XMD",
-            image: MENU_IMAGE_URL,
-            buttons: [
-                {
-                    name: "cta_url",
-                    buttonParamsJson: JSON.stringify({
-                        display_text: "🌐 Official Channel",
-                        url: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
-                    })
+        await conn.sendMessage(from, {
+            image: { url: MENU_IMAGE_URL },
+            caption: menu,
+            contextInfo: {
+                externalAdReply: {
+                    title: "POPKID XMD",
+                    body: "The Best WhatsApp Bot",
+                    thumbnailUrl: MENU_IMAGE_URL,
+                    sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T",
+                    mediaType: 1,
+                    renderLargerThumbnail: true
                 }
-            ]
-        });
+            }
+        }, { quoted: mek });
 
     } catch (e) {
         console.error(e);
