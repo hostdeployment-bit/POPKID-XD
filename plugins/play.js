@@ -3,13 +3,13 @@ const axios = require('axios');
 
 cmd({
     pattern: "play",
-    desc: "Download music accurately using Aswin Sparky API",
+    desc: "Download music using GiftedTech API",
     category: "main",
     filename: __filename
 }, async (conn, m, mek, { from, args, reply }) => {
     try {
         if (!args[0]) {
-            return reply("❌ Please provide a song name or Spotify link, Popkid!");
+            return reply("❌ Please provide a song name or link, Popkid!");
         }
 
         const query = args.join(" ");
@@ -17,7 +17,7 @@ cmd({
 
         let finalUrl = query;
 
-        // 1. Search YouTube if the input is not a link
+        // 1. YouTube Search (if input isn't a link)
         if (!query.startsWith("http")) {
             const searchRes = await axios.get(`https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`);
             if (!searchRes.data.status || !searchRes.data.results.length) {
@@ -26,33 +26,33 @@ cmd({
             finalUrl = searchRes.data.results[0].url;
         }
 
-        // 2. Fetch data from the Aswin Sparky API
-        const apiUrl = `https://aswin-sparky.koyeb.app/api/downloader/spotify?url=${encodeURIComponent(finalUrl)}`;
+        // 2. Fetch using GiftedTech API (The result structure you provided)
+        const apiUrl = `https://api.giftedtech.co.ke/api/download/ytdl?url=${encodeURIComponent(finalUrl)}`;
         const { data } = await axios.get(apiUrl);
 
-        if (!data.status || !data.data) {
-            return reply("❌ Failed to fetch audio from the API.");
+        if (!data.success || !data.result) {
+            return reply("❌ API error. Please try again later.");
         }
 
-        // 3. Extracting exact fields from your working result
-        const audioDownloadUrl = data.data.download; 
-        const songTitle = data.data.title;
-        const artist = data.data.artist || "Unknown Artist";
+        // Mapping to your new GiftedTech JSON structure
+        const audioUrl = data.result.download_url;
+        const title = data.result.title;
+        const thumbnail = data.result.thumbnail;
 
-        // 4. Send confirmation message
-        await reply(`🎶 *Popkid-MD Player*\n\n📌 *Title:* ${songTitle}\n👤 *Artist:* ${artist}\n📦 *Status:* Sending Audio...`);
+        // 3. Simple Status Message
+        await reply(`🎶 *Popkid-MD Player*\n\n📌 *Title:* ${title}\n📦 *Status:* Sending...`);
 
-        // 5. Send Audio File accurately
+        // 4. Send Audio (Corrected for playback issues)
         await conn.sendMessage(from, { 
-            audio: { url: audioDownloadUrl }, 
+            audio: { url: audioUrl }, 
             mimetype: 'audio/mpeg',
-            fileName: `${songTitle}.mp3` // Keeps file recognition stable
+            fileName: `${title}.mp3` // Ensures WhatsApp treats it as a playable file
         }, { quoted: mek });
 
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (e) {
         console.error(e);
-        reply("❌ System Error: API is currently unresponsive.");
+        reply("❌ System Error: API might be busy.");
     }
 });
