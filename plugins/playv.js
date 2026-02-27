@@ -12,9 +12,9 @@ const { cmd } = require("../command");
 const config = require("../config");
 
 // Helper context info
-const NEWSLETTER_JID = "120363382023564830@newsletter";
-const NEWSLETTER_NAME = "Bmb Tech Info";
-const BOT = config.botName || "Nova-Xmd";
+const NEWSLETTER_JID = "120363423997837331@newsletter";
+const NEWSLETTER_NAME = "POPKID XD";
+const BOT = "Popkid XD";
 
 const buildCaption = (video) => {
   const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
@@ -23,7 +23,7 @@ const buildCaption = (video) => {
 
   return (
     `┌───────────────\n` +
-    `│ 🎬 Nova-Xmd Video Player\n` +
+    `│ 🎬 Popkid XD Video \n` +
     `├───────────────\n` +
     `│ 🎵 Title   : ${video.title}\n` +
     `│ ⏱ Duration: ${video.timestamp || video.duration || "N/A"}\n` +
@@ -35,23 +35,33 @@ const buildCaption = (video) => {
   );
 };
 
-const getContextInfo = (query = "") => ({
+// STYLISH NEWSLETTER CONTEXT
+const getContextInfo = (query = "", video = {}) => ({
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
     newsletterJid: NEWSLETTER_JID,
     newsletterName: NEWSLETTER_NAME,
-    serverMessageId: -1
+    serverMessageId: 143
   },
-  body: query ? `Requested: ${query}` : undefined,
-  title: BOT
+  externalAdReply: {
+    title: video.title || BOT,
+    body: NEWSLETTER_NAME,
+    mediaType: 1,
+    renderLargerThumbnail: true,
+    thumbnailUrl: video.thumbnail,
+    sourceUrl: video.url,
+    showAdAttribution: false
+  },
+  body: query ? `🎬 Requested: ${query}` : BOT,
+  title: NEWSLETTER_NAME
 });
 
 const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
 
 /* ========== PLAY VIDEO ========== */
 cmd({
-  pattern: "v",
+  pattern: "video",
   alias: ["pv", "vx"],
   use: ".playvideo <video name>",
   react: "🎬",
@@ -60,6 +70,7 @@ cmd({
   filename: __filename
 },
 async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
+
   const query = q || args.join(" ");
   if (!query) return conn.sendMessage(from, { text: "Please provide a video name." }, { quoted: mek });
 
@@ -79,7 +90,7 @@ async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
     await conn.sendMessage(from, {
       image: { url: video.thumbnail, renderSmallThumbnail: true },
       caption: buildCaption(video),
-      contextInfo: getContextInfo(query)
+      contextInfo: getContextInfo(query, video)
     }, { quoted: mek });
 
     // Send video file
@@ -88,11 +99,12 @@ async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
       caption: buildCaption(video),
       mimetype: "video/mp4",
       fileName,
-      contextInfo: getContextInfo(query)
+      contextInfo: getContextInfo(query, video)
     }, { quoted: mek });
 
   } catch (e) {
     console.error("[PLAY VIDEO ERROR]", e);
     await conn.sendMessage(from, { text: "An error occurred while processing your request." }, { quoted: mek });
   }
+
 });
