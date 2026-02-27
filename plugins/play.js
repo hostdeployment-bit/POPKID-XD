@@ -1,128 +1,106 @@
-/**
- * yt-play.js
- * Pluins command play song enjoy
- *
- * Requires: axios, yt-search
- * Install: npm i axios yt-search
- */
-
-const axios = require("axios");
 const yts = require("yt-search");
-const { cmd } = require("../command");
-const config = require("../config");
+const axios = require("axios");
 
-// Helper context info (match other plugins)
-const NEWSLETTER_JID = "120363423997837331@newsletter";
-const NEWSLETTER_NAME = "🎧POPKID🎧";
-const BOT = config.botName || "POPKID-XD";
+const GIFTED_API = "https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=";
 
-const buildCaption = (type, video) => {
-  const banner = type === "video" ? "🎬 POPKID-XD Video Player" : "🎧 Nova-Xmd Music Player";
-  const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
-  const ago = video.ago || video.timestamp || "N/A";
-  const channel = (video.author && video.author.name) || video.author || "Unknown";
+module.exports = {
 
-  return (
-    `┌───────────────\n` +
-    `│ ${banner}\n` +
-    `├───────────────\n` +
-    `│ 🎵 Title   : ${video.title}\n` +
-    `│ ⏱ Duration: ${video.timestamp || video.duration || "N/A"}\n` +
-    `│ 👁 Views   : ${views}\n` +
-    `│ 📅 Uploaded: ${ago}\n` +
-    `│ 📺 Channel : ${channel}\n` +
-    `└───────────────\n\n` +
-    `🔗 ${video.url}`
-  );
-};
-
-// STYLISH NEWSLETTER CONTEXT
-const getContextInfo = (query = "", video = {}) => ({
-  forwardingScore: 999,
-  isForwarded: true,
-
-  forwardedNewsletterMessageInfo: {
-    newsletterJid: NEWSLETTER_JID,
-    newsletterName: NEWSLETTER_NAME,
-    serverMessageId: 143
-  },
-
-  externalAdReply: {
-    title: video.title || BOT,
-    body: NEWSLETTER_NAME,
-    mediaType: 1,
-    renderLargerThumbnail: true,
-    thumbnailUrl: video.thumbnail,
-    sourceUrl: video.url,
-    showAdAttribution: false
-  },
-
-  body: query ? `🎧 Requested: ${query}` : BOT,
-  title: NEWSLETTER_NAME
-});
-
-const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
-
-/* ========== PLAY (audio stream) ========== */
-cmd({
   pattern: "play",
-  alias: ["p"],
-  use: ".play <song name>",
-  react: "🎵",
-  desc: "Play audio (stream) from YouTube",
-  category: "download",
-  filename: __filename
-},
-async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
+  aliases: ["ytmp3", "music", "song", "yta"],
+  category: "downloader",
+  react: "🎶",
+  description: "Download Audio from Youtube",
 
-  const query = q || args.join(" ");
-  if (!query) return conn.sendMessage(from, { text: "Please provide a song name." }, { quoted: mek });
+  async run(from, Gifted, conText) {
 
-  try {
+    const {
+      q,
+      reply,
+      react,
+      botPic,
+      botName,
+      gmdBuffer,
+      formatAudio
+    } = conText;
 
-    const search = await yts(query);
-    const video = (search && (search.videos && search.videos[0])) || (search.all && search.all[0]);
+    try {
 
-    if (!video)
-      return conn.sendMessage(from, { text: "No results found." }, { quoted: mek });
+      if (!q) {
+        await react("❌");
+        return reply("Please provide a song name");
+      }
 
-    const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, "");
-    const fileName = `${safeTitle}.mp3`;
+      await react("🔍");
 
-    const apiURL =
-      `${BASE_URL}/dipto/ytDl3?link=${encodeURIComponent(video.videoId || video.url)}&format=mp3`;
+      // Search YouTube
+      const search = await yts(q);
 
-    const { data } = await axios.get(apiURL);
+      if (!search.videos.length) {
+        await react("❌");
+        return reply("No song found");
+      }
 
-    if (!data || !data.downloadLink)
-      return conn.sendMessage(from, { text: "Failed to get download link." }, { quoted: mek });
+      const video = search.videos[0];
+      const videoUrl = video.url;
 
-    await conn.sendMessage(from, {
-      image: {
-        url: video.thumbnail,
-        renderSmallThumbnail: true
-      },
-      caption: buildCaption("audio", video),
-      contextInfo: getContextInfo(query, video)
-    }, { quoted: mek });
+      await react("⬇️");
 
-    await conn.sendMessage(from, {
-      audio: {
-        url: data.downloadLink
-      },
-      mimetype: "audio/mpeg",
-      fileName,
-      contextInfo: getContextInfo(query, video)
-    }, { quoted: mek });
+      // Call GiftedTech API
+      const { data } = await axios.get(
+        GIFTED_API + encodeURIComponent(videoUrl)
+      );
 
-  } catch (e) {
+      if (!data.success) {
+        await react("❌");
+        return reply("Download failed");
+      }
 
-    console.error("[PLAY ERROR]", e);
+      const downloadUrl = data.result.download_url;
+      const title = data.result.title;
+      const thumbnail = data.result.thumbnail;
 
-    await conn.sendMessage(from, {
-      text: "An error occurred while processing your request."
-    }, { quoted: mek });
+      // Get audio buffer
+      const buffer = await gmdBuffer(downloadUrl);
+
+      // Convert audio to WhatsApp compatible format
+      const convertedAudio = await formatAudio(buffer);
+
+      // Send thumbnail info
+      await Gifted.sendMessage(
+        from,
+        {
+          image: { url: thumbnail || botPic },
+          caption:
+`🎶 *${botName} AUDIO DOWNLOADER*
+
+⿻ Title: ${title}
+⿻ Duration: ${video.timestamp}
+
+Sending audio...`
+        }
+      );
+
+      // Send audio using new WhatsApp format
+      await Gifted.sendMessage(
+        from,
+        {
+          audio: convertedAudio,
+          mimetype: "audio/mpeg"
+        }
+      );
+
+      await react("✅");
+
+    }
+    catch (error) {
+
+      console.error("Play Error:", error);
+
+      await react("❌");
+      reply("Failed to download audio. Try again later.");
+
+    }
 
   }
 
-});
+};
