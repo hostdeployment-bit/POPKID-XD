@@ -12,12 +12,12 @@ const { cmd } = require("../command");
 const config = require("../config");
 
 // Helper context info (match other plugins)
-const NEWSLETTER_JID = "120363382023564830@newsletter";
-const NEWSLETTER_NAME = "Bmb Tech Info";
-const BOT = config.botName || "Nova-Xmd";
+const NEWSLETTER_JID = "120363423997837331@newsletter";
+const NEWSLETTER_NAME = "POPKID MD";
+const BOT = "POPKID-MD";
 
 const buildCaption = (type, video) => {
-  const banner = type === "video" ? `NOVA XMD VIDEO PLAYER` : `NOVA XMD SONG PLAYER`;
+  const banner = type === "video" ? `POPKID MD VIDEO PLAYER` : `POPKID MD SONG PLAYER`;
   const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
   const ago = video.ago || video.timestamp || "N/A";
   const channel = (video.author && video.author.name) || video.author || "Unknown";
