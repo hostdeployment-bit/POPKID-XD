@@ -1,182 +1,153 @@
 const { cmd } = require('../command');
 const axios = require('axios');
-const yts = require('yt-search');
 const { sendButtons } = require('gifted-btns');
 
-const API_BASE = 'https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=';
+const SEARCH_API = "https://api.yupra.my.id/api/search/spotify?q=";
+const DOWNLOAD_API = "https://api.yupra.my.id/api/downloader/spotify?url=";
 
 cmd({
     pattern: "play",
-    alias: ["song", "audio", "music"],
-    desc: "Download audio using GiftedTech API",
+    alias: ["spotify", "spdl"],
+    desc: "Download Spotify songs using link or search",
     category: "downloader",
     filename: __filename
 }, async (conn, mek, m, { from, q, reply, botFooter, botPic }) => {
 
     try {
 
-        if (!q) return reply("🎵 *Popkid, please provide a song name!*");
+        if (!q) {
+            return reply("🎧 Provide Spotify link or song name");
+        }
 
         await conn.sendMessage(from, {
-            react: { text: "🎶", key: mek.key }
+            react: { text: "🔎", key: mek.key }
         });
 
-        // Search YouTube
-        const search = await yts(q);
-        const video = search.videos[0];
+        let spotifyUrl = q;
 
-        if (!video) return reply("❌ No results found.");
+        // If not Spotify link, search
+        if (!q.includes("spotify.com")) {
 
-        const dateNow = Date.now();
+            const searchRes = await axios.get(
+                SEARCH_API + encodeURIComponent(q)
+            );
 
-        // Premium caption
+            if (!searchRes.data.status || !searchRes.data.result.length) {
+                return reply("❌ Song not found on Spotify");
+            }
+
+            spotifyUrl = searchRes.data.result[0].url;
+        }
+
+        await conn.sendMessage(from, {
+            react: { text: "⬇️", key: mek.key }
+        });
+
+        // Download
+        const { data } = await axios.get(
+            DOWNLOAD_API + encodeURIComponent(spotifyUrl)
+        );
+
+        if (!data.status) {
+            return reply("❌ Failed to download song");
+        }
+
+        const result = data.result;
+
+        const title = result.title;
+        const artist = result.artist;
+        const image = result.image || botPic;
+        const downloadUrl = result.download.url;
+
+        const id = Date.now();
+
         const caption = `
-✨ *𝐏𝐎𝐏𝐊𝐈𝐃-𝐌𝐃 𝐆𝐈𝐅𝐓𝐄𝐃𝐓𝐄𝐂𝐇 𝐀𝐔𝐃𝐈𝐎* ✨
+✨ *POP KID MD SPOTIFY DOWNLOADER*
 
-📝 *Title:* ${video.title}
-🕒 *Duration:* ${video.timestamp}
-👤 *Author:* ${video.author.name}
-👁 *Views:* ${video.views.toLocaleString()}
-📅 *Uploaded:* ${video.ago}
+🎵 Title: ${title}
+👤 Artist: ${artist}
+💿 Quality: MP3
 
-🎧 *Select format below*
-`.trim();
+Select format below
+`;
 
-        // Send buttons
         await sendButtons(conn, from, {
 
-            title: "ᴀᴜᴅɪᴏ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ",
+            title: "Spotify Downloader",
             text: caption,
-            footer: botFooter || "ᴘᴏᴘᴋɪᴅ ᴀɪ 🇰🇪",
-            image: video.thumbnail || botPic,
+            footer: botFooter || "popkid ai 🇰🇪",
+            image: image,
 
             buttons: [
-
-                {
-                    id: `aud_${video.id}_${dateNow}`,
-                    text: "🎵 Audio (MP3)"
-                },
-
-                {
-                    id: `doc_${video.id}_${dateNow}`,
-                    text: "📁 Document"
-                },
-
-                {
-                    id: `ptt_${video.id}_${dateNow}`,
-                    text: "🔉 Voice Note"
-                }
-
+                { id: `aud_${id}`, text: "🎵 Audio" },
+                { id: `doc_${id}`, text: "📁 Document" },
+                { id: `ptt_${id}`, text: "🔉 Voice Note" }
             ]
 
         });
 
-        // Button handler
         const handler = async (event) => {
 
             const msg = event.messages[0];
             if (!msg.message) return;
 
-            const selectedId =
+            const selected =
                 msg.message?.templateButtonReplyMessage?.selectedId ||
                 msg.message?.buttonsResponseMessage?.selectedButtonId;
 
-            if (!selectedId) return;
-            if (!selectedId.includes(`_${dateNow}`)) return;
+            if (!selected || !selected.includes(id)) return;
             if (msg.key.remoteJid !== from) return;
 
+            const type = selected.split("_")[0];
+
             await conn.sendMessage(from, {
-                react: { text: "⬇️", key: msg.key }
+                react: { text: "📥", key: msg.key }
             });
 
-            try {
-
-                // Fetch download from GiftedTech
-                const { data } = await axios.get(
-                    API_BASE + encodeURIComponent(video.url)
-                );
-
-                if (!data.success) {
-
-                    return reply("❌ Failed to fetch audio.");
-
-                }
-
-                const downloadUrl = data.result.download_url;
-                const title = data.result.title;
-
-                const type = selectedId.split("_")[0];
-
-                // Send based on type
-                if (type === "aud") {
-
-                    await conn.sendMessage(from, {
-
-                        audio: { url: downloadUrl },
-                        mimetype: "audio/mpeg",
-                        ptt: false
-
-                    }, { quoted: msg });
-
-                }
-
-                else if (type === "doc") {
-
-                    await conn.sendMessage(from, {
-
-                        document: { url: downloadUrl },
-                        mimetype: "audio/mpeg",
-                        fileName: title + ".mp3",
-                        caption: `📁 *${title}*`
-
-                    }, { quoted: msg });
-
-                }
-
-                else if (type === "ptt") {
-
-                    await conn.sendMessage(from, {
-
-                        audio: { url: downloadUrl },
-                        mimetype: "audio/ogg; codecs=opus",
-                        ptt: true
-
-                    }, { quoted: msg });
-
-                }
+            if (type === "aud") {
 
                 await conn.sendMessage(from, {
+                    audio: { url: downloadUrl },
+                    mimetype: "audio/mpeg"
+                }, { quoted: msg });
 
-                    react: { text: "✅", key: msg.key }
+            }
 
-                });
+            else if (type === "doc") {
+
+                await conn.sendMessage(from, {
+                    document: { url: downloadUrl },
+                    mimetype: "audio/mpeg",
+                    fileName: `${title}.mp3`
+                }, { quoted: msg });
 
             }
 
-            catch (err) {
+            else if (type === "ptt") {
 
-                console.error(err);
-                reply("❌ Download failed.");
+                await conn.sendMessage(from, {
+                    audio: { url: downloadUrl },
+                    mimetype: "audio/ogg; codecs=opus",
+                    ptt: true
+                }, { quoted: msg });
 
             }
+
+            await conn.sendMessage(from, {
+                react: { text: "✅", key: msg.key }
+            });
 
         };
 
         conn.ev.on("messages.upsert", handler);
 
         setTimeout(() => {
-
             conn.ev.off("messages.upsert", handler);
-
         }, 300000);
 
     }
-
     catch (e) {
-
-        console.error(e);
+        console.log(e);
         reply("❌ Error: " + e.message);
-
     }
-
 });
