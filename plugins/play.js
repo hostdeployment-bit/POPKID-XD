@@ -1,97 +1,68 @@
 const { cmd } = require('../command');
 const axios = require('axios');
 
-const SEARCH_API = "https://api.yupra.my.id/api/search/spotify?q=";
-const DOWNLOAD_API = "https://api.yupra.my.id/api/downloader/spotify?url=";
-
 cmd({
     pattern: "play",
-    alias: ["spotify", "spdl"],
-    desc: "Download Spotify song using name or link",
-    category: "downloader",
+    desc: "Download audio from YouTube by name or link",
+    category: "main",
     filename: __filename
-}, async (conn, mek, m, { from, q, reply }) => {
-
+}, async (conn, m, mek, { from, args, reply }) => {
     try {
-
-        if (!q) {
-            return reply("🎧 Please provide song name or Spotify link");
+        if (!args[0]) {
+            return reply("❌ Please provide a song name or link, Popkid!\n\nExample:\n.song cardigan");
         }
 
-        await conn.sendMessage(from, {
-            react: { text: "🔎", key: mek.key }
-        });
+        const query = args.join(" ");  
+        const start = Date.now();  
 
-        let spotifyUrl = q;
+        await conn.sendMessage(from, { react: { text: "🎧", key: mek.key } });  
 
-        // If user entered song name → search Spotify
-        if (!q.includes("spotify.com")) {
+        let videoUrl = query;  
 
-            const search = await axios.get(
-                SEARCH_API + encodeURIComponent(q)
-            );
+        // 1. Search Logic (Yupra API)
+        if (!query.includes("youtube.com") && !query.includes("youtu.be")) {  
+            const searchUrl = `https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`;  
+            const searchRes = await axios.get(searchUrl);  
 
-            if (!search.data.status || !search.data.result.length) {
-                return reply("❌ Song not found");
-            }
+            if (!searchRes.data.status || !searchRes.data.results || searchRes.data.results.length === 0) {  
+                return reply("❌ No results found.");  
+            }  
 
-            spotifyUrl = search.data.result[0].url;
-        }
+            videoUrl = searchRes.data.results[0].url;  
+        }  
 
-        await conn.sendMessage(from, {
-            react: { text: "⬇️", key: mek.key }
-        });
+        // 2. Download Logic (Jawad-Tech API as requested)
+        const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(videoUrl)}`;  
+        const { data } = await axios.get(apiUrl);  
 
-        // Download from Spotify downloader API
-        const { data } = await axios.get(
-            DOWNLOAD_API + encodeURIComponent(spotifyUrl)
-        );
+        if (!data.status || !data.result || !data.result.mp3) {  
+            return reply("❌ API failed to generate an audio link. Try again later.");  
+        }  
 
-        if (!data.status) {
-            return reply("❌ Failed to download song");
-        }
+        const title = data.result.title || "Popkid-Audio";  
+        const audioDownloadUrl = data.result.mp3; 
 
-        const result = data.result;
+        const end = Date.now();  
+        const speed = end - start;  
 
-        const title = result.title;
-        const artist = result.artist;
-        const image = result.image;
-        const downloadUrl = result.download.url;
+        // 3. Inform User
+        await reply(  
+            `🎧 *Popkid Audio Downloader*\n\n` +  
+            `📌 *Title:* ${title}\n` +  
+            `⚡ *Speed:* ${speed} ms\n\n` +  
+            `⬇️ Sending audio file...`  
+        );  
 
-        // Send thumbnail + info
-        await conn.sendMessage(from, {
+        // 4. Send Audio (Optimized for WhatsApp compatibility)
+        await conn.sendMessage(from, {  
+            audio: { url: audioDownloadUrl },  
+            mimetype: "audio/mpeg",  
+            fileName: `${title}.mp3`, // Adding extension helps prevent the "audio not available" error
+            ptt: false // Set to true if you want it sent as a voice note
+        }, { quoted: mek });  
 
-            image: { url: image },
-            caption:
-`🎧 *SPOTIFY DOWNLOADER*
-
-🎵 Title: ${title}
-👤 Artist: ${artist}
-
-⬇️ Downloading audio...`
-
-        }, { quoted: mek });
-
-        // Send audio
-        await conn.sendMessage(from, {
-
-            audio: { url: downloadUrl },
-            mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`
-
-        }, { quoted: mek });
-
-        await conn.sendMessage(from, {
-            react: { text: "✅", key: mek.key }
-        });
-
+    } catch (err) {  
+        console.error(err);  
+        reply("❌ Error: " + err.message);  
     }
-
-    catch (err) {
-
-        console.error(err);
-        reply("❌ Error downloading song");
-
-    }
-
 });
