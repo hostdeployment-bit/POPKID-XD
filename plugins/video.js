@@ -1,9 +1,7 @@
 /**
  * yt-play-video.js
- * Plugin command to play video from YouTube
- *
+ * Optimized styling for Popkid-MD
  * Requires: axios, yt-search
- * Install: npm i axios yt-search
  */
 
 const axios = require("axios");
@@ -11,50 +9,42 @@ const yts = require("yt-search");
 const { cmd } = require("../command");
 const config = require("../config");
 
-// Helper context info
+// Exact Newsletter and Bot Info for Popkid-MD
 const NEWSLETTER_JID = "120363423997837331@newsletter";
-const NEWSLETTER_NAME = "POPKID XD";
-const BOT = "Popkid XD";
+const NEWSLETTER_NAME = "POPKID MD";
+const BOT = "POPKID-MD";
 
 const buildCaption = (video) => {
-  const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
-  const ago = video.ago || video.timestamp || "N/A";
-  const channel = (video.author && video.author.name) || video.author || "Unknown";
+  const duration = video.timestamp || video.duration || "N/A";
 
   return (
-    `┌───────────────\n` +
-    `│ 🎬 Popkid XD Video \n` +
-    `├───────────────\n` +
-    `│ 🎵 Title   : ${video.title}\n` +
-    `│ ⏱ Duration: ${video.timestamp || video.duration || "N/A"}\n` +
-    `│ 👁 Views   : ${views}\n` +
-    `│ 📅 Uploaded: ${ago}\n` +
-    `│ 📺 Channel : ${channel}\n` +
-    `└───────────────\n\n` +
-    `🔗 ${video.url}`
+    `*🎬 POPKID MD VIDEO PLAYER*\n\n` +
+    `╭───────────────◆\n` +
+    `│ 📑 Title: ${video.title}\n` +
+    `│ ⏳ Duration: ${duration}\n` +
+    `╰────────────────◆\n\n` +
+    `⏳ *Sending video...*`
   );
 };
 
-// STYLISH NEWSLETTER CONTEXT
 const getContextInfo = (query = "", video = {}) => ({
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
     newsletterJid: NEWSLETTER_JID,
     newsletterName: NEWSLETTER_NAME,
-    serverMessageId: 143
+    serverMessageId: -1
   },
   externalAdReply: {
     title: video.title || BOT,
-    body: NEWSLETTER_NAME,
+    body: "Popkid-MD Video Downloader",
     mediaType: 1,
     renderLargerThumbnail: true,
     thumbnailUrl: video.thumbnail,
-    sourceUrl: video.url,
-    showAdAttribution: false
+    sourceUrl: video.url || "https://whatsapp.com/channel/0029VaeS6id0VycC9uY09s0F"
   },
-  body: query ? `🎬 Requested: ${query}` : BOT,
-  title: NEWSLETTER_NAME
+  body: query ? `Requested: ${query}` : undefined,
+  title: BOT
 });
 
 const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
@@ -63,7 +53,7 @@ const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
 cmd({
   pattern: "video",
   alias: ["pv", "vx"],
-  use: ".playvideo <video name>",
+  use: ".video <video name>",
   react: "🎬",
   desc: "Play video from YouTube",
   category: "download",
@@ -86,21 +76,24 @@ async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
     const { data } = await axios.get(apiURL);
     if (!data || !data.downloadLink) return conn.sendMessage(from, { text: "Failed to get download link." }, { quoted: mek });
 
-    // Send thumbnail + caption
+    // 1. Send thumbnail + caption
     await conn.sendMessage(from, {
-      image: { url: video.thumbnail, renderSmallThumbnail: true },
+      image: { url: video.thumbnail },
       caption: buildCaption(video),
       contextInfo: getContextInfo(query, video)
     }, { quoted: mek });
 
-    // Send video file
+    // 2. Send video file with matching style
     await conn.sendMessage(from, {
       video: { url: data.downloadLink },
-      caption: buildCaption(video),
+      caption: `✅ *${video.title}* downloaded successfully!`,
       mimetype: "video/mp4",
       fileName,
       contextInfo: getContextInfo(query, video)
     }, { quoted: mek });
+
+    // Success Reaction
+    await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
   } catch (e) {
     console.error("[PLAY VIDEO ERROR]", e);
