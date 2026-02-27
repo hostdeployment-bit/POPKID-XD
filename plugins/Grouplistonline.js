@@ -1,11 +1,6 @@
 const config = require('../config');
 const { cmd } = require('../command');
 
-// Your newsletter settings
-const NEWSLETTER_JID = "120363423997837331@newsletter";
-const NEWSLETTER_NAME = "𝙋𝙊𝙋𝙆𝙄𝘿 𝙈𝘿";
-const BOT_NAME = "Popkid XD";
-
 cmd({
     pattern: "online",
     alias: ["listonline", "whosonline", "whoisonline"],
@@ -130,21 +125,11 @@ async (conn, mek, m, { from, isGroup, reply, react }) => {
             text: text,
             mentions: mentions,
             contextInfo: {
-                forwardingScore: 999,
+                forwardingScore: 5,
                 isForwarded: true,
-
                 forwardedNewsletterMessageInfo: {
-                    newsletterJid: NEWSLETTER_JID,
-                    newsletterName: NEWSLETTER_NAME,
-                    serverMessageId: 143
-                },
-
-                externalAdReply: {
-                    title: "🟢 Active Members List",
-                    body: NEWSLETTER_NAME,
-                    mediaType: 1,
-                    renderLargerThumbnail: false,
-                    showAdAttribution: false
+                    newsletterName: config.BOT_NAME || "WhatsApp Bot",
+                    newsletterJid: config.NEWSLETTER_JID || "120363000000000000@newsletter"
                 }
             }
         }, { quoted: mek });
