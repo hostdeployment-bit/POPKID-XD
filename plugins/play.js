@@ -1,63 +1,12 @@
-/**
- * yt-play.js
- * Plugin command to play audio/video from YouTube using numbered replies
- *
- * Requires: axios, yt-search
- * Install: npm i axios yt-search
- */
+// Temporary store for pending replies
+const pendingPlayReplies = {};
 
-const axios = require("axios");
-const yts = require("yt-search");
-const { cmd } = require("../command");
-const config = require("../config");
-
-const NEWSLETTER_JID = "120363382023564830@newsletter";
-const NEWSLETTER_NAME = "Bmb Tech Info";
-const BOT = config.botName || "Nova-Xmd";
-const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
-
-// Temporary store to track user selections
-const pendingPlayRequests = {};
-
-const buildCaption = (type, video) => {
-  const banner = type.includes("video") ? "🎬 Nova-Xmd Video Player" : "🎧 Nova-Xmd Music Player";
-  const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
-  const ago = video.ago || video.timestamp || "N/A";
-  const channel = (video.author && video.author.name) || video.author || "Unknown";
-
-  return (
-    `┌───────────────\n` +
-    `│ ${banner}\n` +
-    `├───────────────\n` +
-    `│ 🎵 Title   : ${video.title}\n` +
-    `│ ⏱ Duration: ${video.timestamp || video.duration || "N/A"}\n` +
-    `│ 👁 Views   : ${views}\n` +
-    `│ 📅 Uploaded: ${ago}\n` +
-    `│ 📺 Channel : ${channel}\n` +
-    `└───────────────\n\n` +
-    `🔗 ${video.url}`
-  );
-};
-
-const getContextInfo = (query = "") => ({
-  forwardingScore: 999,
-  isForwarded: true,
-  forwardedNewsletterMessageInfo: {
-    newsletterJid: NEWSLETTER_JID,
-    newsletterName: NEWSLETTER_NAME,
-    serverMessageId: -1
-  },
-  body: query ? `Requested: ${query}` : undefined,
-  title: BOT
-});
-
-/* ========== PLAY COMMAND ========== */
+// ========== PLAY COMMAND ==========
 cmd({
   pattern: "play",
   alias: ["p"],
-  use: ".play <song/video name>",
   react: "🎵",
-  desc: "Play audio/video from YouTube with numbered menu",
+  desc: "Play audio/video from YouTube using numbers",
   category: "download",
   filename: __filename
 }, async (conn, mek, m, { from, args, q, reply }) => {
@@ -66,13 +15,13 @@ cmd({
 
   try {
     const search = await yts(query);
-    const video = (search && (search.videos && search.videos[0])) || (search.all && search.all[0]);
+    const video = (search && search.videos && search.videos[0]) || (search.all && search.all[0]);
     if (!video) return conn.sendMessage(from, { text: "No results found." }, { quoted: mek });
 
     const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, "");
 
-    // Save pending request with sender ID
-    pendingPlayRequests[from] = { video, safeTitle };
+    // Save pending request for this user
+    pendingPlayReplies[from] = { video, safeTitle };
 
     // Send numbered menu
     const menu = `
@@ -91,21 +40,23 @@ Reply with the number (1-5) to get your choice.
 
   } catch (e) {
     console.error("[PLAY ERROR]", e);
-    await conn.sendMessage(from, { text: "An error occurred while searching for your request." }, { quoted: mek });
+    await conn.sendMessage(from, { text: "An error occurred while searching." }, { quoted: mek });
   }
 });
 
-/* ========== REPLY HANDLER FOR NUMBER MENU ========== */
+// ========== REPLY HANDLER ==========
 cmd({
   pattern: ".*",
   dontAddCommandList: true
 }, async (conn, mek, m, { from, body }) => {
-  if (!pendingPlayRequests[from]) return; // No pending menu for this user
-  if (!/^[1-5]$/.test(body.trim())) return; // Only accept 1-5
+  // Only proceed if user has a pending menu
+  if (!pendingPlayReplies[from]) return;
 
   const choice = body.trim();
-  const { video, safeTitle } = pendingPlayRequests[from];
-  delete pendingPlayRequests[from]; // Clear after selection
+  if (!/^[1-5]$/.test(choice)) return; // Only accept numbers 1–5
+
+  const { video, safeTitle } = pendingPlayReplies[from];
+  delete pendingPlayReplies[from]; // Clear pending request
 
   const formatMap = {
     "1": { type: "audio", format: "mp3" },
@@ -163,7 +114,7 @@ cmd({
     }
 
   } catch (e) {
-    console.error("[PLAY NUMBER ERROR]", e);
+    console.error("[PLAY REPLY ERROR]", e);
     await conn.sendMessage(from, { text: "An error occurred while processing your selection." }, { quoted: mek });
   }
 });
