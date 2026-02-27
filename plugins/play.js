@@ -1,71 +1,95 @@
-const { cmd } = require('../command');
-const yts = require("yt-search");
+/**
+ * yt-play.js
+ * Pluins command play song enjoy
+ *
+ * Requires: axios, yt-search
+ * Install: npm i axios yt-search
+ */
+
 const axios = require("axios");
+const yts = require("yt-search");
+const { cmd } = require("../command");
+const config = require("../config");
 
-const NEWSLETTER = "120363423997837331@newsletter";
-const NEWSLETTER_NAME = "POPKID MD";
-const API = "https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=";
+// Helper context info (match other plugins)
+const NEWSLETTER_JID = "120363382023564830@newsletter";
+const NEWSLETTER_NAME = "Bmb Tech Info";
+const BOT = config.botName || "Nova-Xmd";
 
+const buildCaption = (type, video) => {
+  const banner = type === "video" ? `NOVA XMD VIDEO PLAYER` : `NOVA XMD SONG PLAYER`;
+  const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
+  const ago = video.ago || video.timestamp || "N/A";
+  const channel = (video.author && video.author.name) || video.author || "Unknown";
+
+  return (
+    `*${banner}*\n\n` +
+    `╭───────────────◆\n` +
+    `│ ⿻ Title: ${video.title}\n` +
+    `│ ⿻ Duration: ${video.timestamp || video.duration || "N/A"}\n` +
+    `│ ⿻ Views: ${views}\n` +
+    `│ ⿻ Uploaded: ${ago}\n` +
+    `│ ⿻ Channel: ${channel}\n` +
+    `╰────────────────◆\n\n` +
+    `🔗 ${video.url}`
+  );
+};
+
+const getContextInfo = (query = "") => ({
+  forwardingScore: 999,
+  isForwarded: true,
+  forwardedNewsletterMessageInfo: {
+    newsletterJid: NEWSLETTER_JID,
+    newsletterName: NEWSLETTER_NAME,
+    serverMessageId: -1
+  },
+  body: query ? `Requested: ${query}` : undefined,
+  title: BOT
+});
+
+const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
+
+/* ========== PLAY (audio stream) ========== */
 cmd({
-    pattern: "play",
-    alias: ["p", "music", "song"],
-    desc: "Download Audio from YouTube",
-    category: "downloader",
-    filename: __filename
+  pattern: "play",
+  alias: ["p"],
+  use: ".play <song name>",
+  react: "🎵",
+  desc: "Play audio (stream) from YouTube",
+  category: "download",
+  filename: __filename
 },
-async (conn, m, mek, { from, q, reply }) => {
-    try {
-        if (!q) return reply("❌ Please provide a song name, Popkid!");
+async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
+  const query = q || args.join(" ");
+  if (!query) return conn.sendMessage(from, { text: "Please provide a song name." }, { quoted: mek });
 
-        await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
+  try {
+    const search = await yts(query);
+    const video = (search && (search.videos && search.videos[0])) || (search.all && search.all[0]);
+    if (!video) return conn.sendMessage(from, { text: "No results found." }, { quoted: mek });
 
-        // 1. Search YouTube
-        const search = await yts(q);
-        const video = search.videos?.[0];
-        if (!video) return reply("❌ No song found");
+    const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, "");
+    const fileName = `${safeTitle}.mp3`;
+    const apiURL = `${BASE_URL}/dipto/ytDl3?link=${encodeURIComponent(video.videoId || video.url)}&format=mp3`;
 
-        // 2. Fetch from GiftedTech API
-        const { data } = await axios.get(API + encodeURIComponent(video.url));
-        if (!data || !data.success || !data.result?.download_url) {
-            return reply("❌ Failed to get download link from API.");
-        }
+    const { data } = await axios.get(apiURL);
+    if (!data || !data.downloadLink) return conn.sendMessage(from, { text: "Failed to get download link." }, { quoted: mek });
 
-        const { title, thumbnail, download_url } = data.result;
+    await conn.sendMessage(from, {
+      image: { url: video.thumbnail, renderSmallThumbnail: true },
+      caption: buildCaption("audio", video),
+      contextInfo: getContextInfo(query)
+    }, { quoted: mek });
 
-        // 3. Send Preview Image
-        await conn.sendMessage(from, {
-            image: { url: thumbnail },
-            caption: `🎶 *POPKID MD PLAYER*\n\n⿻ *Title:* ${title}\n⿻ *Duration:* ${video.timestamp}\n\n⏳ *Sending audio...*`,
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: NEWSLETTER,
-                    newsletterName: NEWSLETTER_NAME
-                }
-            }
-        }, { quoted: mek });
+    await conn.sendMessage(from, {
+      audio: { url: data.downloadLink },
+      mimetype: "audio/mpeg",
+      fileName,
+      contextInfo: getContextInfo(query)
+    }, { quoted: mek });
 
-        // 4. Send Playable Audio (Fixed for "Not Available" Error)
-        await conn.sendMessage(from, {
-            audio: { url: download_url },
-            mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`, // Essential for playback support
-            contextInfo: {
-                externalAdReply: {
-                    title: title,
-                    body: "Popkid-MD Music",
-                    mediaType: 1,
-                    thumbnailUrl: thumbnail,
-                    renderLargerThumbnail: false
-                }
-            }
-        }, { quoted: mek });
-
-        await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
-
-    } catch (error) {
-        console.error(error);
-        reply("❌ Error: API is busy or link is broken.");
-    }
+  } catch (e) {
+    console.error("[PLAY ERROR]", e);
+    await conn.sendMessage(from, { text: "An error occurred while processing your request." }, { quoted: mek });
+  }
 });
