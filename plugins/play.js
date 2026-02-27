@@ -1,9 +1,7 @@
 /**
  * yt-play.js
- * Pluins command play song enjoy
- *
+ * Exact styling for Popkid-MD
  * Requires: axios, yt-search
- * Install: npm i axios yt-search
  */
 
 const axios = require("axios");
@@ -11,27 +9,22 @@ const yts = require("yt-search");
 const { cmd } = require("../command");
 const config = require("../config");
 
-// Helper context info (match other plugins)
+// Exact Newsletter and Bot Info
 const NEWSLETTER_JID = "120363423997837331@newsletter";
 const NEWSLETTER_NAME = "POPKID MD";
 const BOT = "POPKID-MD";
 
 const buildCaption = (type, video) => {
-  const banner = type === "video" ? `POPKID MD VIDEO PLAYER` : `POPKID MD SONG PLAYER`;
-  const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
-  const ago = video.ago || video.timestamp || "N/A";
-  const channel = (video.author && video.author.name) || video.author || "Unknown";
+  const banner = type === "video" ? `🎬 POPKID MD VIDEO PLAYER` : `🎶 POPKID MD PLAYER`;
+  const duration = video.timestamp || video.duration || "N/A";
 
   return (
     `*${banner}*\n\n` +
     `╭───────────────◆\n` +
-    `│ ⿻ Title: ${video.title}\n` +
-    `│ ⿻ Duration: ${video.timestamp || video.duration || "N/A"}\n` +
-    `│ ⿻ Views: ${views}\n` +
-    `│ ⿻ Uploaded: ${ago}\n` +
-    `│ ⿻ Channel: ${channel}\n` +
+    `│ 📑 Title: ${video.title}\n` +
+    `│ ⏳ Duration: ${duration}\n` +
     `╰────────────────◆\n\n` +
-    `🔗 ${video.url}`
+    `⏳ *Sending audio...*`
   );
 };
 
@@ -64,29 +57,54 @@ async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
   if (!query) return conn.sendMessage(from, { text: "Please provide a song name." }, { quoted: mek });
 
   try {
+    // 1. YouTube Search
     const search = await yts(query);
     const video = (search && (search.videos && search.videos[0])) || (search.all && search.all[0]);
     if (!video) return conn.sendMessage(from, { text: "No results found." }, { quoted: mek });
 
     const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, "");
     const fileName = `${safeTitle}.mp3`;
+    
+    // 2. Fetch using working API
     const apiURL = `${BASE_URL}/dipto/ytDl3?link=${encodeURIComponent(video.videoId || video.url)}&format=mp3`;
-
     const { data } = await axios.get(apiURL);
+    
     if (!data || !data.downloadLink) return conn.sendMessage(from, { text: "Failed to get download link." }, { quoted: mek });
 
+    // 3. Send exact Image Preview with "View Channel" link
     await conn.sendMessage(from, {
-      image: { url: video.thumbnail, renderSmallThumbnail: true },
+      image: { url: video.thumbnail },
       caption: buildCaption("audio", video),
-      contextInfo: getContextInfo(query)
+      contextInfo: {
+        ...getContextInfo(query),
+        externalAdReply: {
+            title: NEWSLETTER_NAME,
+            body: "Get more info about this message.",
+            mediaType: 1,
+            sourceUrl: "https://whatsapp.com/channel/0029VaeS6id0VycC9uY09s0F", // View Channel link
+            renderLargerThumbnail: false
+        }
+      }
     }, { quoted: mek });
 
+    // 4. Send Playable Audio (Matching the look in your last photo)
     await conn.sendMessage(from, {
       audio: { url: data.downloadLink },
       mimetype: "audio/mpeg",
-      fileName,
-      contextInfo: getContextInfo(query)
+      fileName: fileName,
+      contextInfo: {
+        externalAdReply: {
+          title: video.title,
+          body: "Popkid-MD Music",
+          mediaType: 1,
+          thumbnailUrl: video.thumbnail,
+          renderLargerThumbnail: false
+        }
+      }
     }, { quoted: mek });
+
+    // Success Reaction
+    await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
   } catch (e) {
     console.error("[PLAY ERROR]", e);
