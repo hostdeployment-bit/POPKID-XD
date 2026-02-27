@@ -6,7 +6,7 @@ const NEWSLETTER = "120363423997837331@newsletter";
 const NEWSLETTER_NAME = "POPKID MD";
 const GIFTED_API = "https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=";
 
-// Helper: GiftedTech API query
+// GiftedTech API helper
 const queryGiftedAPI = async (videoUrl) => {
     const { data } = await axios.get(GIFTED_API + encodeURIComponent(videoUrl));
     if (!data.success) return { success: false };
@@ -28,12 +28,14 @@ cmd({
     filename: __filename
 },
 async (from, Gifted, conText) => {
-    let { q, args, m, reply, react, botPic, botName, gmdBuffer, formatAudio } = conText;
+    const { q, args, m, reply, react, botPic, botName, gmdBuffer, formatAudio } = conText;
 
-    // ✅ FIX: Ensure query is properly extracted
-    q = q || (args && args.join(" ")) || (m?.text?.split(" ").slice(1).join(" "));
+    // ✅ FIX: Ensure query is captured no matter what
+    let query = q?.trim() 
+        || (args && args.join(" ").trim()) 
+        || (m?.text?.trim().split(" ").slice(1).join(" "));
 
-    if (!q || q.trim() === "") {
+    if (!query) {
         await react("❌");
         return reply("Please provide a song name");
     }
@@ -42,57 +44,57 @@ async (from, Gifted, conText) => {
         await react("🔍");
 
         // Search YouTube
-        const searchRes = await yts(q);
-        if (!searchRes.videos.length) return reply("No video found for your query.");
+        const searchRes = await yts(query);
+        if (!searchRes.videos.length) {
+            await react("❌");
+            return reply("No video found for your query.");
+        }
 
         const video = searchRes.videos[0];
         const videoUrl = video.url;
 
-        // GiftedTech API
+        // Call GiftedTech API
         const apiRes = await queryGiftedAPI(videoUrl);
         if (!apiRes.success) {
             await react("❌");
-            return reply("Download service unavailable. Try later.");
+            return reply("Download service unavailable. Try again later.");
         }
 
         await react("⬇️");
 
-        // Buffer & convert
+        // Fetch buffer and convert to WhatsApp compatible audio
         const buffer = await gmdBuffer(apiRes.download_url);
         const audioBuffer = await formatAudio(buffer);
 
-        // Send audio as **playable music**
-        await Gifted.sendMessage(
-            from,
-            {
-                audio: audioBuffer,
-                mimetype: "audio/mpeg",
-                fileName: `${apiRes.title}.mp3`,
-                contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: NEWSLETTER,
-                        newsletterName: NEWSLETTER_NAME
-                    },
-                    externalAdReply: {
-                        title: apiRes.title,
-                        body: NEWSLETTER_NAME,
-                        mediaType: 1,
-                        thumbnailUrl: apiRes.thumbnail || botPic,
-                        renderLargerThumbnail: true,
-                        sourceUrl: videoUrl
-                    }
+        // Send as **playable music** with thumbnail
+        await Gifted.sendMessage(from, {
+            audio: audioBuffer,
+            mimetype: "audio/mpeg",
+            fileName: `${apiRes.title}.mp3`,
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: NEWSLETTER,
+                    newsletterName: NEWSLETTER_NAME
                 },
-                caption: `🎶 *${botName} AUDIO PLAYER*\n⿻ Title: ${apiRes.title}\n⿻ Quality: ${apiRes.quality}`
-            }
-        );
+                externalAdReply: {
+                    title: apiRes.title,
+                    body: NEWSLETTER_NAME,
+                    mediaType: 1,
+                    thumbnailUrl: apiRes.thumbnail || botPic,
+                    renderLargerThumbnail: true,
+                    sourceUrl: videoUrl
+                }
+            },
+            caption: `🎶 *${botName} AUDIO PLAYER*\n⿻ Title: ${apiRes.title}\n⿻ Quality: ${apiRes.quality}`
+        });
 
         await react("✅");
 
     } catch (err) {
         console.error("Play command error:", err);
         await react("❌");
-        reply("Oops! Something went wrong. Please try again.");
+        return reply("Oops! Something went wrong. Please try again.");
     }
 });
