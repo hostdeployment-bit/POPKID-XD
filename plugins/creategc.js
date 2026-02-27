@@ -51,7 +51,7 @@ async (conn, mek, m, { from, sender, reply, react, q, isOwner }) => {
         // Check group name
         if (!q || !q.trim()) {
             await react("❌");
-            return reply("❌ Please provide a group name.\n\nExample:\n.newgc ATASSA MD");
+            return reply("❌ Please provide a group name.\n\nExample:\n.newgc POPKID MD");
         }
 
         const groupName = q.trim();
