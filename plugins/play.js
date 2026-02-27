@@ -6,7 +6,7 @@ const NEWSLETTER = "120363423997837331@newsletter";
 const NEWSLETTER_NAME = "POPKID MD";
 const GIFTED_API = "https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=";
 
-// Query GiftedTech API
+// Helper: GiftedTech API query
 const queryGiftedAPI = async (videoUrl) => {
     const { data } = await axios.get(GIFTED_API + encodeURIComponent(videoUrl));
     if (!data.success) return { success: false };
@@ -28,9 +28,12 @@ cmd({
     filename: __filename
 },
 async (from, Gifted, conText) => {
-    const { q, reply, react, botPic, botName, gmdBuffer, formatAudio } = conText;
+    let { q, args, m, reply, react, botPic, botName, gmdBuffer, formatAudio } = conText;
 
-    if (!q) {
+    // ✅ FIX: Ensure query is properly extracted
+    q = q || (args && args.join(" ")) || (m?.text?.split(" ").slice(1).join(" "));
+
+    if (!q || q.trim() === "") {
         await react("❌");
         return reply("Please provide a song name");
     }
@@ -45,7 +48,7 @@ async (from, Gifted, conText) => {
         const video = searchRes.videos[0];
         const videoUrl = video.url;
 
-        // Query GiftedTech API
+        // GiftedTech API
         const apiRes = await queryGiftedAPI(videoUrl);
         if (!apiRes.success) {
             await react("❌");
@@ -54,11 +57,11 @@ async (from, Gifted, conText) => {
 
         await react("⬇️");
 
-        // Fetch buffer and convert properly
+        // Buffer & convert
         const buffer = await gmdBuffer(apiRes.download_url);
-        const audioBuffer = await formatAudio(buffer); // Ensure WhatsApp-compatible format
+        const audioBuffer = await formatAudio(buffer);
 
-        // Send as **playable audio** with thumbnail
+        // Send audio as **playable music**
         await Gifted.sendMessage(
             from,
             {
