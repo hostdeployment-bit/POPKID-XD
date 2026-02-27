@@ -1,123 +1,109 @@
+const { cmd } = require('../command');
 const yts = require("yt-search");
 const axios = require("axios");
-const { cmd } = require('../command');
 
-const GIFTED_API = "https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=";
+const NEWSLETTER = "120363423997837331@newsletter";
+const NEWSLETTER_NAME = "POPKID MD";
 
-// Newsletter settings
-const NEWSLETTER_JID = "120363423997837331@newsletter";
-const NEWSLETTER_NAME = "𝙋𝙊𝙋𝙆𝙄𝘿 𝙈𝘿";
-const BOT_NAME = "Popkid XD";
+const API = "https://api.giftedtech.co.ke/api/download/dlmp3?apikey=gifted&url=";
 
 cmd({
     pattern: "play",
-    aliases: ["ytmp3", "music", "song", "yta"],
+    alias: ["ytmp3", "music", "song", "yta"],
+    desc: "Download Audio from YouTube",
     category: "downloader",
     react: "🎶",
-    desc: "Download Audio from Youtube",
     filename: __filename
-}, async (conn, m, mek, { from, reply, react, botPic, botName, gmdBuffer, formatAudio, q }) => {
+},
+async (conn, m, mek, { from, q, reply }) => {
 
     try {
 
         if (!q) {
-            await react("❌", mek.key);
+            await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
             return reply("Please provide a song name");
         }
 
-        // Ping-style search start
-        const start = Date.now();
         await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
-        const searchTime = Date.now() - start;
 
         // Search YouTube
         const search = await yts(q);
-        if (!search.videos.length) {
-            await react("❌", mek.key);
+
+        if (!search.videos || search.videos.length === 0) {
+            await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
             return reply("No song found");
         }
 
         const video = search.videos[0];
         const videoUrl = video.url;
 
-        await react("⬇️", mek.key);
+        await conn.sendMessage(from, { react: { text: "⬇️", key: mek.key } });
 
         // Call GiftedTech API
-        const { data } = await axios.get(GIFTED_API + encodeURIComponent(videoUrl));
+        const res = await axios.get(API + encodeURIComponent(videoUrl));
+        const data = res.data;
+
         if (!data.success) {
-            await react("❌", mek.key);
+            await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
             return reply("Download failed");
         }
 
-        const downloadUrl = data.result.download_url;
         const title = data.result.title;
         const thumbnail = data.result.thumbnail;
+        const downloadUrl = data.result.download_url;
+        const quality = data.result.quality;
 
-        // Get audio buffer
-        const buffer = await gmdBuffer(downloadUrl);
-        const convertedAudio = await formatAudio(buffer);
-
-        // Send thumbnail with newsletter style
-        await conn.sendMessage(from, {
-            image: { url: thumbnail || botPic },
-            caption:
-`🎶 *${botName} AUDIO DOWNLOADER*
+        // Send thumbnail info with newsletter context
+        await conn.sendMessage(
+            from,
+            {
+                image: { url: thumbnail },
+                caption:
+`🎶 *${NEWSLETTER_NAME} AUDIO DOWNLOADER*
 
 ⿻ Title: ${title}
-⿻ Duration: ${video.timestamp}
+⿻ Quality: ${quality}
 
-Downloading took: ${searchTime}ms
 Sending audio...`,
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: NEWSLETTER_JID,
-                    newsletterName: NEWSLETTER_NAME,
-                    serverMessageId: 143
-                },
-                externalAdReply: {
-                    title: title,
-                    body: NEWSLETTER_NAME,
-                    mediaType: 1,
-                    thumbnailUrl: thumbnail || botPic,
-                    renderLargerThumbnail: false,
-                    showAdAttribution: false,
-                    sourceUrl: videoUrl
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: NEWSLETTER,
+                        newsletterName: NEWSLETTER_NAME
+                    }
                 }
-            }
-        });
+            },
+            { quoted: mek }
+        );
 
-        // Send audio
-        await conn.sendMessage(from, {
-            audio: convertedAudio,
-            mimetype: "audio/mpeg",
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: NEWSLETTER_JID,
-                    newsletterName: NEWSLETTER_NAME,
-                    serverMessageId: 143
-                },
-                externalAdReply: {
-                    title: title,
-                    body: NEWSLETTER_NAME,
-                    mediaType: 1,
-                    thumbnailUrl: thumbnail || botPic,
-                    renderLargerThumbnail: false,
-                    showAdAttribution: false,
-                    sourceUrl: videoUrl
+        // Send audio directly from URL (better than buffer)
+        await conn.sendMessage(
+            from,
+            {
+                audio: { url: downloadUrl },
+                mimetype: "audio/mpeg",
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: NEWSLETTER,
+                        newsletterName: NEWSLETTER_NAME
+                    }
                 }
-            }
-        });
+            },
+            { quoted: mek }
+        );
 
-        await react("✅", mek.key);
+        await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
-    } catch (error) {
-        console.error("Play Error:", error);
-        await react("❌", mek.key);
+    } catch (err) {
+
+        console.error("Play Error:", err);
+
+        await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
         reply("Failed to download audio. Try again later.");
+
     }
 
 });
