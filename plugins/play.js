@@ -1,6 +1,6 @@
 /**
  * yt-play.js
- * Fully functional YouTube play command with numbered replies
+ * Pluins command play song enjoy
  *
  * Requires: axios, yt-search
  * Install: npm i axios yt-search
@@ -11,16 +11,13 @@ const yts = require("yt-search");
 const { cmd } = require("../command");
 const config = require("../config");
 
-const NEWSLETTER_JID = "120363382023564830@newsletter";
-const NEWSLETTER_NAME = "Bmb Tech Info";
-const BOT = config.botName || "Nova-Xmd";
-const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
-
-// Pending replies: { from: { video, safeTitle, timeoutId } }
-const pendingPlayReplies = {};
+// Helper context info (match other plugins)
+const NEWSLETTER_JID = "120363423997837331@newsletter";
+const NEWSLETTER_NAME = "🎧POPKID🎧";
+const BOT = config.botName || "POPKID-XD";
 
 const buildCaption = (type, video) => {
-  const banner = type.includes("video") ? "🎬 Nova-Xmd Video Player" : "🎧 Nova-Xmd Music Player";
+  const banner = type === "video" ? "🎬 POPKID-XD Video Player" : "🎧 Nova-Xmd Music Player";
   const views = typeof video.views === "number" ? video.views.toLocaleString() : video.views || "N/A";
   const ago = video.ago || video.timestamp || "N/A";
   const channel = (video.author && video.author.name) || video.author || "Unknown";
@@ -39,141 +36,93 @@ const buildCaption = (type, video) => {
   );
 };
 
-const getContextInfo = (query = "") => ({
+// STYLISH NEWSLETTER CONTEXT
+const getContextInfo = (query = "", video = {}) => ({
   forwardingScore: 999,
   isForwarded: true,
+
   forwardedNewsletterMessageInfo: {
     newsletterJid: NEWSLETTER_JID,
     newsletterName: NEWSLETTER_NAME,
-    serverMessageId: -1
+    serverMessageId: 143
   },
-  body: query ? `Requested: ${query}` : undefined,
-  title: BOT
+
+  externalAdReply: {
+    title: video.title || BOT,
+    body: NEWSLETTER_NAME,
+    mediaType: 1,
+    renderLargerThumbnail: true,
+    thumbnailUrl: video.thumbnail,
+    sourceUrl: video.url,
+    showAdAttribution: false
+  },
+
+  body: query ? `🎧 Requested: ${query}` : BOT,
+  title: NEWSLETTER_NAME
 });
 
-// ========== PLAY COMMAND ==========
+const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
+
+/* ========== PLAY (audio stream) ========== */
 cmd({
   pattern: "play",
   alias: ["p"],
+  use: ".play <song name>",
   react: "🎵",
-  desc: "Play audio/video from YouTube with numbered menu",
+  desc: "Play audio (stream) from YouTube",
   category: "download",
   filename: __filename
-}, async (conn, mek, m, { from, args, q, reply }) => {
-  const query = q || args.join(" ").trim();
-  if (!query) return conn.sendMessage(from, { text: "Please provide a song or video name." }, { quoted: mek });
+},
+async (conn, mek, m, { from, args, q, quoted, isCmd, reply }) => {
+
+  const query = q || args.join(" ");
+  if (!query) return conn.sendMessage(from, { text: "Please provide a song name." }, { quoted: mek });
 
   try {
+
     const search = await yts(query);
-    const video = (search && search.videos && search.videos[0]) || (search.all && search.all[0]);
-    if (!video) return conn.sendMessage(from, { text: "No results found." }, { quoted: mek });
+    const video = (search && (search.videos && search.videos[0])) || (search.all && search.all[0]);
+
+    if (!video)
+      return conn.sendMessage(from, { text: "No results found." }, { quoted: mek });
 
     const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, "");
+    const fileName = `${safeTitle}.mp3`;
 
-    // Clear existing pending request for the user if any
-    if (pendingPlayReplies[from]) clearTimeout(pendingPlayReplies[from].timeoutId);
+    const apiURL =
+      `${BASE_URL}/dipto/ytDl3?link=${encodeURIComponent(video.videoId || video.url)}&format=mp3`;
 
-    // Save pending request with 2-minute timeout
-    const timeoutId = setTimeout(() => {
-      delete pendingPlayReplies[from];
-      conn.sendMessage(from, { text: "⏰ Menu expired. Please type .play <song> again." });
-    }, 2 * 60 * 1000); // 2 minutes
-
-    pendingPlayReplies[from] = { video, safeTitle, timeoutId };
-
-    // Send numbered menu
-    const menu = `
-Choose how you want to receive "${video.title}":
-
-1. 🎧 Audio
-2. 🎬 Video
-3. 📃 Audio Document
-4. 📃 Video Document
-5. 🎙 Voice Note
-
-Reply with the number (1-5) to get your choice.
-`;
-
-    await conn.sendMessage(from, { text: menu }, { quoted: mek });
-
-  } catch (e) {
-    console.error("[PLAY ERROR]", e);
-    await conn.sendMessage(from, { text: "An error occurred while searching." }, { quoted: mek });
-  }
-});
-
-// ========== REPLY HANDLER ==========
-cmd({
-  pattern: ".*",
-  dontAddCommandList: true
-}, async (conn, mek, m, { from, body }) => {
-  const userPending = pendingPlayReplies[from];
-  if (!userPending) return; // No pending menu for this user
-
-  const choice = body.trim();
-  if (!/^[1-5]$/.test(choice)) return; // Only accept 1-5
-
-  const { video, safeTitle, timeoutId } = userPending;
-  clearTimeout(timeoutId);
-  delete pendingPlayReplies[from]; // Clear after selection
-
-  const formatMap = {
-    "1": { type: "audio", format: "mp3" },
-    "2": { type: "video", format: "mp4" },
-    "3": { type: "adoc", format: "mp3" },
-    "4": { type: "vdoc", format: "mp4" },
-    "5": { type: "vn", format: "mp3" }
-  };
-
-  const { type, format } = formatMap[choice];
-  const apiURL = `${BASE_URL}/dipto/ytDl3?link=${encodeURIComponent(video.videoId || video.url)}&format=${format}`;
-
-  try {
     const { data } = await axios.get(apiURL);
-    if (!data || !data.downloadLink) return conn.sendMessage(from, { text: "Failed to get download link." }, { quoted: mek });
 
-    const fileName = `${safeTitle}.${format}`;
+    if (!data || !data.downloadLink)
+      return conn.sendMessage(from, { text: "Failed to get download link." }, { quoted: mek });
 
-    if (type === "audio") {
-      await conn.sendMessage(from, {
-        audio: { url: data.downloadLink },
-        mimetype: "audio/mpeg",
-        fileName,
-        contextInfo: getContextInfo(safeTitle)
-      }, { quoted: mek });
-    } else if (type === "video") {
-      await conn.sendMessage(from, {
-        video: { url: data.downloadLink },
-        caption: buildCaption("video", video),
-        mimetype: "video/mp4",
-        fileName,
-        contextInfo: getContextInfo(safeTitle)
-      }, { quoted: mek });
-    } else if (type === "adoc") {
-      await conn.sendMessage(from, {
-        document: { url: data.downloadLink },
-        mimetype: "audio/mpeg",
-        fileName,
-        contextInfo: getContextInfo(safeTitle)
-      }, { quoted: mek });
-    } else if (type === "vdoc") {
-      await conn.sendMessage(from, {
-        document: { url: data.downloadLink },
-        mimetype: "video/mp4",
-        fileName,
-        contextInfo: getContextInfo(safeTitle)
-      }, { quoted: mek });
-    } else if (type === "vn") {
-      await conn.sendMessage(from, {
-        audio: { url: data.downloadLink },
-        mimetype: "audio/mpeg",
-        ptt: true,
-        contextInfo: getContextInfo(safeTitle)
-      }, { quoted: mek });
-    }
+    await conn.sendMessage(from, {
+      image: {
+        url: video.thumbnail,
+        renderSmallThumbnail: true
+      },
+      caption: buildCaption("audio", video),
+      contextInfo: getContextInfo(query, video)
+    }, { quoted: mek });
+
+    await conn.sendMessage(from, {
+      audio: {
+        url: data.downloadLink
+      },
+      mimetype: "audio/mpeg",
+      fileName,
+      contextInfo: getContextInfo(query, video)
+    }, { quoted: mek });
 
   } catch (e) {
-    console.error("[PLAY REPLY ERROR]", e);
-    await conn.sendMessage(from, { text: "An error occurred while processing your selection." }, { quoted: mek });
+
+    console.error("[PLAY ERROR]", e);
+
+    await conn.sendMessage(from, {
+      text: "An error occurred while processing your request."
+    }, { quoted: mek });
+
   }
+
 });
