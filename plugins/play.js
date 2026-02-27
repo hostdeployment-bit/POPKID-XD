@@ -3,76 +3,56 @@ const axios = require('axios');
 
 cmd({
     pattern: "play",
-    desc: "Download music from YouTube or Spotify accurately",
+    desc: "Download music accurately using Aswin Sparky API",
     category: "main",
     filename: __filename
 }, async (conn, m, mek, { from, args, reply }) => {
     try {
         if (!args[0]) {
-            return reply("❌ Please provide a song name, Spotify link, or YouTube link!");
+            return reply("❌ Please provide a song name or Spotify link, Popkid!");
         }
 
         const query = args.join(" ");
-        await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
+        await conn.sendMessage(from, { react: { text: "🎧", key: mek.key } });
 
-        let audioUrl = "";
-        let title = "";
+        let finalUrl = query;
 
-        // 1. Check if it's a Spotify Link
-        if (query.includes("spotify.com")) {
-            const spotifyApi = `https://api.yupra.my.id/api/download/spotify?url=${encodeURIComponent(query)}`;
-            const { data } = await axios.get(spotifyApi);
-
-            if (data.status && data.result) {
-                // Using the exact result path you provided
-                audioUrl = data.result.download.url;
-                title = `${data.result.title} - ${data.result.artist}`;
-            } else {
-                return reply("❌ Spotify API could not find the song.");
+        // 1. Search YouTube if the input is not a link
+        if (!query.startsWith("http")) {
+            const searchRes = await axios.get(`https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`);
+            if (!searchRes.data.status || !searchRes.data.results.length) {
+                return reply("❌ Song not found.");
             }
-        } 
-        
-        // 2. Otherwise, treat as YouTube (Search + Download)
-        else {
-            let youtubeLink = query;
-            
-            // Search via Yupra if it's just text
-            if (!query.includes("youtube.com") && !query.includes("youtu.be")) {
-                const search = await axios.get(`https://api.yupra.my.id/api/search/youtube?q=${encodeURIComponent(query)}`);
-                if (!search.data.status || !search.data.results.length) return reply("❌ Song not found on YouTube.");
-                youtubeLink = search.data.results[0].url;
-            }
-
-            // Download via Jawad-Tech (Your confirmed working API)
-            const download = await axios.get(`https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(youtubeLink)}`);
-            if (download.data.status && download.data.result) {
-                audioUrl = download.data.result.mp3;
-                title = download.data.result.title;
-            } else {
-                return reply("❌ YouTube API error. Please try again.");
-            }
+            finalUrl = searchRes.data.results[0].url;
         }
 
-        // 3. Final Step: Send the Audio File
+        // 2. Fetch data from the Aswin Sparky API
+        const apiUrl = `https://aswin-sparky.koyeb.app/api/downloader/spotify?url=${encodeURIComponent(finalUrl)}`;
+        const { data } = await axios.get(apiUrl);
+
+        if (!data.status || !data.data) {
+            return reply("❌ Failed to fetch audio from the API.");
+        }
+
+        // 3. Extracting exact fields from your working result
+        const audioDownloadUrl = data.data.download; 
+        const songTitle = data.data.title;
+        const artist = data.data.artist || "Unknown Artist";
+
+        // 4. Send confirmation message
+        await reply(`🎶 *Popkid-MD Player*\n\n📌 *Title:* ${songTitle}\n👤 *Artist:* ${artist}\n📦 *Status:* Sending Audio...`);
+
+        // 5. Send Audio File accurately
         await conn.sendMessage(from, { 
-            audio: { url: audioUrl }, 
+            audio: { url: audioDownloadUrl }, 
             mimetype: 'audio/mpeg',
-            fileName: `${title}.mp3`,
-            contextInfo: {
-                externalAdReply: {
-                    title: "Popkid-MD Player",
-                    body: title,
-                    mediaType: 1,
-                    sourceUrl: "https://github.com/Popkid", // Optional: Your profile link
-                    renderLargerThumbnail: false
-                }
-            }
+            fileName: `${songTitle}.mp3` // Keeps file recognition stable
         }, { quoted: mek });
 
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (e) {
         console.error(e);
-        reply("❌ System Error: " + e.message);
+        reply("❌ System Error: API is currently unresponsive.");
     }
 });
