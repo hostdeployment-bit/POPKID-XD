@@ -1,6 +1,6 @@
 /**
  * 👑 POPKID-MD (Anti-Crash Version)
- * Creator: Popkid Kenya
+ * Creator: Popkid Ke
  * Improvements: Refined Status Logic, Aesthetic Logs, Auto-Reconnect
  */
 
