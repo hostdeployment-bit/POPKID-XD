@@ -216,13 +216,49 @@ async function connectToWA() {
                 return;
             }
 
-            // ============ MESSAGE LOGGER ============
+            // ============ MESSAGE LOGGER (SLIM-FIT BOX) ============
             if (!mek.key.fromMe) {
                 const typeLog = getContentType(mek.message);
-                const pushLog = mek.pushName || 'User';
-                const bodyLog = (typeLog === 'conversation') ? mek.message.conversation : (typeLog === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : '[Media Message]';
-                cmdLogger.message(`📩 [${pushLog}] : ${bodyLog.substring(0, 30)}...`);
+                const pushLog = (mek.pushName || 'User').substring(0, 12);
+                const senderNum = sender.split('@')[0].substring(0, 10);
+                
+                // Group name or DM logic for the box
+                const groupMetadata = from.endsWith('@g.us') ? await conn.groupMetadata(from).catch(e => {}) : '';
+                const groupName = groupMetadata ? groupMetadata.subject : 'Private';
+                const locLog = groupName.substring(0, 10);
+
+                const timeLog = new Date().toLocaleTimeString('en-KE', { 
+                    timeZone: 'Africa/Nairobi', 
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                let msgBody = '';
+                if (typeLog === 'conversation') msgBody = mek.message.conversation;
+                else if (typeLog === 'extendedTextMessage') msgBody = mek.message.extendedTextMessage.text;
+                else if (typeLog === 'imageMessage') msgBody = '📸 Image';
+                else if (typeLog === 'videoMessage') msgBody = '🎥 Video';
+                else msgBody = `📦 ${typeLog.replace('Message', '')}`;
+
+                const cleanMsg = msgBody.replace(/\n/g, ' ').substring(0, 25);
+                const boxColor = gradient('#00c6ff', '#0072ff');
+
+                console.log(boxColor(`┌──────────────────────────────────────────┐`));
+                console.log(
+                    boxColor(`│ `) + gradient('#f7971e', '#ffd200')(`${timeLog}`) + 
+                    boxColor(` 👤 `) + gradient('#ffffff', '#bdc3c7')(`${pushLog}`) + " ".repeat(Math.max(0, 12 - pushLog.length)) +
+                    boxColor(` 📍 `) + gradient('#00b09b', '#96c93d')(`${locLog}`) + " ".repeat(Math.max(0, 10 - locLog.length)) + 
+                    boxColor(`│`)
+                );
+                console.log(
+                    boxColor(`│ `) + gradient('#ff00cc', '#3333ff')(`📩 Msg: ${cleanMsg}`) + 
+                    " ".repeat(Math.max(0, 34 - cleanMsg.length)) + 
+                    boxColor(`│`)
+                );
+                console.log(boxColor(`└──────────────────────────────────────────┘`));
             }
+
             if (config.READ_MESSAGE === 'true' && !isStatus) {
                 await conn.readMessages([mek.key]);
             }
