@@ -173,7 +173,7 @@ async function connectToWA() {
                 plugins.forEach(plugin => require("./plugins/" + plugin));
                 cmdLogger.success(`Successfully loaded ${plugins.length} plugins 💎`);
                 cmdLogger.success('POPKID XD IS ONLINE 📲');
-                let up = `╔════════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠════════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚════════════════════╝`;
+                let up = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
                 await conn.sendMessage(conn.user.id, {
                     image: { url: `https://files.catbox.moe/j9ia5c.png` },
                     caption: up
