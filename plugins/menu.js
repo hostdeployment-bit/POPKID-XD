@@ -5,19 +5,16 @@ const { cmd, commands } = require('../command');
 const MENU_IMAGE_URL = "https://files.catbox.moe/aapw1p.png";
 
 // =====================
-// Greeting
+// Simple Greeting Logic
 // =====================
 
 const getGreeting = () => {
     const hour = moment().tz('Africa/Nairobi').hour();
 
-    if (hour >= 5 && hour < 12)
-        return "🌅 Good Morning";
-
-    if (hour >= 12 && hour < 18)
-        return "🌤️ Good Afternoon";
-
-    return "🌙 Good Night";
+    if (hour >= 5 && hour < 12) return "Good Morning 🌅";
+    if (hour >= 12 && hour < 17) return "Good Afternoon ☀️";
+    if (hour >= 17 && hour < 21) return "Good Evening 🌆";
+    return "Good Night 😴";
 };
 
 // =====================
@@ -40,22 +37,17 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
         const date = now.format("DD/MM/YYYY");
         const time = now.format("HH:mm:ss");
 
-        // FIX USERNAME (real WhatsApp name)
-        let userName =
-            pushName ||
-            mek.pushName ||
-            conn.getName(sender) ||
-            "Unknown";
-
+        let userName = pushName || mek.pushName || conn.getName(sender) || "User";
         const greeting = getGreeting();
 
         // =====================
         // Organize Commands
         // =====================
         const commandsByCategory = {};
-        commands
-            .filter(cmd => cmd.pattern && !cmd.dontAdd && cmd.category)
-            .forEach(cmd => {
+        const activeCommands = commands.filter(cmd => cmd.pattern && !cmd.dontAdd && cmd.category);
+        const totalCommands = activeCommands.length; 
+
+        activeCommands.forEach(cmd => {
                 const category = cmd.category.toUpperCase();
                 const name = cmd.pattern.split("|")[0].trim();
                 if (!commandsByCategory[category])
@@ -72,13 +64,13 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
 *┌─❖*
 *│POPKID XMD*
 *└┬❖*
-   *│${greeting} 😴*
+   *│${greeting}*
    *└────────┈❖*
 ▬▬▬▬▬▬▬▬▬▬
 > 🕵️ᴜsᴇʀ ɴᴀᴍᴇ: ${userName}
 > 📅ᴅᴀᴛᴇ: ${date}
 > ⏰ᴛɪᴍᴇ: ${time}
-> ⭐ᴜsᴇʀs: ${commands.length}
+> ⭐ᴛᴏᴛᴀʟ ᴄᴍᴅꜱ: ${totalCommands}
 ▬▬▬▬▬▬▬▬▬▬
 `;
 
@@ -103,9 +95,6 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
 *└──────────────❖*
 `;
 
-        // =====================
-        // CONTEXT INFO (FORWARDED NEWSLETTER STYLE)
-        // =====================
         const newsletterContextInfo = {
             mentionedJid: [sender],
             forwardingScore: 999,
@@ -117,19 +106,16 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
             }
         };
 
-        // =====================
-        // SEND MENU
-        // =====================
         await conn.sendMessage(from, {
             image: { url: MENU_IMAGE_URL },
             caption: menu,
             contextInfo: {
                 ...newsletterContextInfo,
                 externalAdReply: {
-                    title: "POPKID XMD",
+                    title: "POPKID XD",
                     body: userName,
                     mediaType: 1,
-                    renderLargerThumbnail: false // IMPORTANT FIX
+                    renderLargerThumbnail: false 
                 }
             }
         }, { quoted: mek });
