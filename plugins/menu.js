@@ -32,6 +32,20 @@ cmd({
 async (conn, mek, m, { from, sender, pushName, reply }) => {
 
     try {
+        // Define combined fakevCard for quoting
+        const fakevCard = {
+            key: {
+                fromMe: false,
+                participant: "0@s.whatsapp.net",
+                remoteJid: "status@broadcast"
+            },
+            message: {
+                contactMessage: {
+                    displayName: "Popkid Ke",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
+                }
+            }
+        };
 
         const now = moment().tz("Africa/Nairobi");
         const date = now.format("DD/MM/YYYY");
@@ -106,19 +120,22 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
             }
         };
 
+        // =====================
+        // SEND MENU WITH FAKEV-CARD QUOTED
+        // =====================
         await conn.sendMessage(from, {
             image: { url: MENU_IMAGE_URL },
             caption: menu,
             contextInfo: {
                 ...newsletterContextInfo,
                 externalAdReply: {
-                    title: "POPKID XD",
+                    title: "POPKID XMD",
                     body: userName,
                     mediaType: 1,
                     renderLargerThumbnail: false 
                 }
             }
-        }, { quoted: mek });
+        }, { quoted: fakevCard }); // <--- Using the fakevCard here
 
     } catch (e) {
         console.log(e);
