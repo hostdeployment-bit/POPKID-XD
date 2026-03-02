@@ -173,7 +173,7 @@ async function connectToWA() {
                 plugins.forEach(plugin => require("./plugins/" + plugin));
                 cmdLogger.success(`Successfully loaded ${plugins.length} plugins 💎`);
                 cmdLogger.success('POPKID XD IS ONLINE 📲');
-                let up = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
+                let up = `╔════════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠════════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚════════════════════╝`;
                 await conn.sendMessage(conn.user.id, {
                     image: { url: `https://files.catbox.moe/j9ia5c.png` },
                     caption: up
@@ -216,17 +216,11 @@ async function connectToWA() {
                 return;
             }
 
-            // ============ MESSAGE LOGGER (SLIM-FIT BOX) ============
+            // ============ MESSAGE LOGGER (BOXED VERSION) ============
             if (!mek.key.fromMe) {
                 const typeLog = getContentType(mek.message);
-                const pushLog = (mek.pushName || 'User').substring(0, 12);
-                const senderNum = sender.split('@')[0].substring(0, 10);
+                const pushLog = (mek.pushName || 'User').substring(0, 15);
                 
-                // Group name or DM logic for the box
-                const groupMetadata = from.endsWith('@g.us') ? await conn.groupMetadata(from).catch(e => {}) : '';
-                const groupName = groupMetadata ? groupMetadata.subject : 'Private';
-                const locLog = groupName.substring(0, 10);
-
                 const timeLog = new Date().toLocaleTimeString('en-KE', { 
                     timeZone: 'Africa/Nairobi', 
                     hour12: false,
@@ -242,21 +236,16 @@ async function connectToWA() {
                 else msgBody = `📦 ${typeLog.replace('Message', '')}`;
 
                 const cleanMsg = msgBody.replace(/\n/g, ' ').substring(0, 25);
-                const boxColor = gradient('#00c6ff', '#0072ff');
+                const boxColor = gradient('#ff00cc', '#3333ff');
+                const textColor = gradient('#ffffff', '#bdc3c7');
 
-                console.log(boxColor(`┌──────────────────────────────────────────┐`));
-                console.log(
-                    boxColor(`│ `) + gradient('#f7971e', '#ffd200')(`${timeLog}`) + 
-                    boxColor(` 👤 `) + gradient('#ffffff', '#bdc3c7')(`${pushLog}`) + " ".repeat(Math.max(0, 12 - pushLog.length)) +
-                    boxColor(` 📍 `) + gradient('#00b09b', '#96c93d')(`${locLog}`) + " ".repeat(Math.max(0, 10 - locLog.length)) + 
-                    boxColor(`│`)
-                );
-                console.log(
-                    boxColor(`│ `) + gradient('#ff00cc', '#3333ff')(`📩 Msg: ${cleanMsg}`) + 
-                    " ".repeat(Math.max(0, 34 - cleanMsg.length)) + 
-                    boxColor(`│`)
-                );
-                console.log(boxColor(`└──────────────────────────────────────────┘`));
+                console.log(boxColor(`╔════════════════════════════════════╗`));
+                console.log(boxColor(`║ `) + gradient('#00c6ff', '#0072ff').bold(`🚀 POPKID-MD BOT`) + " ".repeat(19) + boxColor(`║`));
+                console.log(boxColor(`╠════════════════════════════════════╣`));
+                console.log(boxColor(`║ `) + textColor(`👤 SENDER: ${pushLog}`) + " ".repeat(Math.max(0, 26 - pushLog.length)) + boxColor(`║`));
+                console.log(boxColor(`║ `) + textColor(`⏰ TIME  : ${timeLog}`) + " ".repeat(18) + boxColor(`║`));
+                console.log(boxColor(`║ `) + textColor(`📩 MSG   : ${cleanMsg}`) + " ".repeat(Math.max(0, 26 - cleanMsg.length)) + boxColor(`║`));
+                console.log(boxColor(`╚════════════════════════════════════╝`));
             }
 
             if (config.READ_MESSAGE === 'true' && !isStatus) {
