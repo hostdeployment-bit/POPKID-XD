@@ -3,7 +3,6 @@ const moment = require('moment-timezone');
 const { cmd, commands } = require('../command');
 
 const MENU_IMAGE_URL = "https://files.catbox.moe/aapw1p.png";
-const CHANNEL_URL = "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T";
 
 // =====================
 // Simple Greeting Logic
@@ -122,7 +121,7 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
         };
 
         // =====================
-        // SEND MENU WITH FIXED THUMBNAIL
+        // SEND MENU WITH FAKEV-CARD QUOTED
         // =====================
         await conn.sendMessage(from, {
             image: { url: MENU_IMAGE_URL },
@@ -131,15 +130,12 @@ async (conn, mek, m, { from, sender, pushName, reply }) => {
                 ...newsletterContextInfo,
                 externalAdReply: {
                     title: "POPKID XMD",
-                    body: "ᴘᴏᴘᴋɪᴅ ᴍᴅ ʙᴏᴛ ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴘᴏᴘᴋɪᴅ 🇰🇪",
+                    body: userName,
                     mediaType: 1,
-                    thumbnailUrl: MENU_IMAGE_URL, // Fixed: This fills the black part
-                    renderLargerThumbnail: true, // Fixed: This makes it full/large
-                    sourceUrl: CHANNEL_URL,
-                    mediaUrl: CHANNEL_URL
+                    renderLargerThumbnail: false 
                 }
             }
-        }, { quoted: fakevCard });
+        }, { quoted: fakevCard }); // <--- Using the fakevCard here
 
     } catch (e) {
         console.log(e);
