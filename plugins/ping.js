@@ -1,9 +1,10 @@
 const { cmd } = require('../command');
-const config = require('../config'); // Make sure you have NEWSLETTER_JID and OWNER_NAME in config
+const config = require('../config');
+const moment = require('moment-timezone');
 
 cmd({
     pattern: "ping",
-    desc: "Check bot speed and forward newsletter in style",
+    desc: "Check bot speed with fake vCard and newsletter style",
     category: "main",
     filename: __filename
 }, async (conn, m, mek, { from, sender, reply }) => {
@@ -13,7 +14,22 @@ cmd({
         const end = Date.now();
         const speedMessage = `🚀 *Pong:* ${end - start}ms`;
 
-        // Context info for forwarded newsletter style
+        // Define the fakevCard (Popkid Ke)
+        const fakevCard = {
+            key: {
+                fromMe: false,
+                participant: "0@s.whatsapp.net",
+                remoteJid: "status@broadcast"
+            },
+            message: {
+                contactMessage: {
+                    displayName: "Popkid Ke",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
+                }
+            }
+        };
+
+        // Context info for newsletter and link preview
         const newsletterContextInfo = {
             mentionedJid: [sender],
             forwardingScore: 999,
@@ -21,18 +37,26 @@ cmd({
             forwardedNewsletterMessageInfo: {
                 newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
                 newsletterName: config.OWNER_NAME || 'POPKID',
-                serverMessageId: 1 // You can set this as needed
+                serverMessageId: 1
+            },
+            externalAdReply: {
+                title: "POPKID XMD PING",
+                body: "𝐒𝐏𝐄𝐄𝐃 𝐂𝐇𝐄𝐂𝐊 ⚡",
+                mediaType: 1,
+                thumbnailUrl: "https://files.catbox.moe/aapw1p.png", // Same menu image
+                renderLargerThumbnail: true,
+                sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
             }
         };
 
-        // Send ping message with newsletter style context
+        // Send ping message with newsletter style and quoted vCard
         await conn.sendMessage(from, { 
             text: speedMessage, 
             contextInfo: newsletterContextInfo 
-        }, { quoted: mek });
+        }, { quoted: fakevCard });
 
     } catch (err) {
         console.error("PING ERROR:", err);
-        reply("❌ *Failed to check ping or forward newsletter.*");
+        reply("❌ *Failed to check ping.*");
     }
 });
