@@ -1,5 +1,5 @@
 const { cmd } = require('../command');
-const config = require('../config'); // Make sure NEWSLETTER_JID and OWNER_NAME exist
+const config = require('../config');
 
 cmd({
     pattern: "uptime",
@@ -17,7 +17,22 @@ cmd({
 
         const uptimeString = `🕒 *ᴜᴘᴛɪᴍᴇ:* ${hours}ʜ ${minutes}ᴍ ${seconds}s`;
 
-        // Forwarded newsletter style context
+        // Define the fakevCard (Popkid Ke)
+        const fakevCard = {
+            key: {
+                fromMe: false,
+                participant: "0@s.whatsapp.net",
+                remoteJid: "status@broadcast"
+            },
+            message: {
+                contactMessage: {
+                    displayName: "Popkid Ke",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
+                }
+            }
+        };
+
+        // Context info for newsletter and large clear image
         const newsletterContextInfo = {
             mentionedJid: [sender],
             forwardingScore: 999,
@@ -26,15 +41,25 @@ cmd({
                 newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
                 newsletterName: config.OWNER_NAME || 'POPKID',
                 serverMessageId: 1
+            },
+            externalAdReply: {
+                title: "POPKID XMD UPTIME",
+                body: "𝐒𝐘𝐒𝐓𝐄𝐌 𝐒𝐓𝐀𝐓𝐔𝐒 🟢",
+                mediaType: 1,
+                thumbnailUrl: "https://files.catbox.moe/aapw1p.png", // Clear image URL
+                renderLargerThumbnail: true, // Makes it full and visible
+                sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
             }
         };
 
-        // Send uptime with reaction and forwarded newsletter style
+        // Send reaction
         await conn.sendMessage(from, { react: { text: "⏳", key: mek.key } });
+
+        // Send uptime with the fixed context and quoted vCard
         await conn.sendMessage(from, { 
             text: uptimeString, 
             contextInfo: newsletterContextInfo 
-        });
+        }, { quoted: fakevCard });
 
     } catch (e) {
         console.log(e);
