@@ -193,24 +193,14 @@ async function connectToWA() {
             const isStatus = from === 'status@broadcast'
             const sender = mek.key.participant || mek.key.remoteJid;
 
-            // ============ ANTI-DELETE MONITOR ============
-            if (config.ANTI_DELETE === "true" && mek.message.protocolMessage && mek.message.protocolMessage.type === 0) {
-                 // Forward the delete signal to the plugin handler
-                 try {
-                     const antiDeletePlugin = require('./plugins/antidelete');
-                     if (typeof antiDeletePlugin === 'function') {
-                         await antiDeletePlugin(conn, mek);
-                     }
-                 } catch (e) {}
-            }
-
             // ============ STATUS HANDLER (USER CUSTOMIZED EMOJIS) ============
             if (isStatus) {
                 if (config.AUTO_STATUS_SEEN === "true") {
                     await conn.readMessages([mek.key]);
                 }
                 if (config.AUTO_STATUS_REACT === "true") {
-                    const emojiString = config.STATUS_REACTIONS || config.CUSTOM_STATUS_EMOJIS || '❤️,🔥,✨,⚡,💎,👑';
+                    // Splits the string from config into an array of emojis
+                    const emojiString = config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,💎,👑';
                     const reactionEmojis = emojiString.split(',').map(e => e.trim());
                     const randomEmoji = reactionEmojis[Math.floor(Math.random() * reactionEmojis.length)];
                     
@@ -272,10 +262,7 @@ async function connectToWA() {
             if (config.READ_MESSAGE === 'true' && !isStatus) {
                 await conn.readMessages([mek.key]);
             }
-            
-            // Critical for Anti-Delete: Store message before it can be deleted
             await saveMessage(mek);
-
             const m = sms(conn, mek)
             const type = getContentType(mek.message)
             const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
