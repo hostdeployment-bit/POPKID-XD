@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Final Stable Version)
+ * 👑 POPKID-MD (Anti-Crash Version)
  * Creator: Popkid Ke
- * Fixed: Anti-Delete Logic & Status Reaction Sync
+ * Improvements: Customizable Status Reactions, Refined Logic, Aesthetic Logs
  */
 
 const fs = require('fs')
@@ -193,29 +193,14 @@ async function connectToWA() {
             const isStatus = from === 'status@broadcast'
             const sender = mek.key.participant || mek.key.remoteJid;
 
-            // ============ 1. ANTI-DELETE MONITOR (HIGH PRIORITY) ============
-            if (config.ANTI_DELETE === "true" && mek.message.protocolMessage && mek.message.protocolMessage.type === 0) {
-                 try {
-                     const antiDeleteHandler = require('./plugins/antidelete');
-                     if (typeof antiDeleteHandler === 'function') {
-                         await antiDeleteHandler(conn, mek);
-                     }
-                 } catch (e) {}
-                 return; 
-            }
-
-            // ============ 2. SAVE MESSAGE (For Future Recovery) ============
-            if (!isStatus) {
-                await saveMessage(mek); 
-            }
-
-            // ============ 3. STATUS HANDLER ============
+            // ============ STATUS HANDLER (USER CUSTOMIZED EMOJIS) ============
             if (isStatus) {
                 if (config.AUTO_STATUS_SEEN === "true") {
                     await conn.readMessages([mek.key]);
                 }
                 if (config.AUTO_STATUS_REACT === "true") {
-                    const emojiString = config.STATUS_REACTIONS || config.CUSTOM_STATUS_EMOJIS || '❤️,🔥,✨,⚡,💎,👑';
+                    // Splits the string from config into an array of emojis
+                    const emojiString = config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,💎,👑';
                     const reactionEmojis = emojiString.split(',').map(e => e.trim());
                     const randomEmoji = reactionEmojis[Math.floor(Math.random() * reactionEmojis.length)];
                     
@@ -277,7 +262,7 @@ async function connectToWA() {
             if (config.READ_MESSAGE === 'true' && !isStatus) {
                 await conn.readMessages([mek.key]);
             }
-            
+            await saveMessage(mek);
             const m = sms(conn, mek)
             const type = getContentType(mek.message)
             const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
@@ -387,7 +372,6 @@ async function connectToWA() {
             conn.query({ tag: 'iq', attrs: { to: '@s.whatsapp.net', type: 'set', xmlns: 'status' }, content: [{ tag: 'status', attrs: {}, content: Buffer.from(status, 'utf-8') }] });
             return status;
         };
-        conn.loadMessage = loadMessage; // Vital bridge for plugins
     } catch (err) {
         cmdLogger.error(`Connection failed: ${err.message}`);
     }
