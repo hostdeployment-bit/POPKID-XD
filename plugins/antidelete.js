@@ -1,38 +1,67 @@
-const { cmd } = require('../command');
-const { getAnti, setAnti } = require('../data/antidel');
+const config = require('../config')
+const { cmd } = require('../command')
 
+/**
+ * 🛠️ ANTI-DELETE CONTROLS
+ * Toggle the system and change the delivery path.
+ */
+
+// 1. Toggle Anti-Delete ON/OFF
 cmd({
     pattern: "antidelete",
-    alias: ['antidel', 'del'],
-    desc: "Toggle anti-delete feature",
-    category: "misc",
+    alias: ["antidel"],
+    desc: "Turn Anti-Delete system ON or OFF.",
+    category: "owner",
     filename: __filename
 },
-async (conn, mek, m, { from, reply, text, isCreator }) => {
-    if (!isCreator) return reply('This command is only for the bot owner');
+async (conn, mek, m, { q, isOwner, reply }) => {
+    if (!isOwner) return reply("❌ Owner only!");
     
-    try {
-        const currentStatus = await getAnti();
-        
-        if (!text || text.toLowerCase() === 'status') {
-            return reply(`*AntiDelete Status:* ${currentStatus ? '✅ ON' : '❌ OFF'}\n\nUsage:\n• .antidelete on - Enable\n• .antidelete off - Disable`);
-        }
-        
-        const action = text.toLowerCase().trim();
-        
-        if (action === 'on') {
-            await setAnti(true);
-            return reply('✅ Anti-delete has been enabled');
-        } 
-        else if (action === 'off') {
-            await setAnti(false);
-            return reply('❌ Anti-delete has been disabled');
-        } 
-        else {
-            return reply('Invalid command. Usage:\n• .antidelete on\n• .antidelete off\n• .antidelete status');
-        }
-    } catch (e) {
-        console.error("Error in antidelete command:", e);
-        return reply("An error occurred while processing your request.");
+    if (q === "on") {
+        config.ANTI_DELETE = "true";
+        reply("✅ *Anti-Delete is now ENABLED.* I will capture deleted messages.");
+    } else if (q === "off") {
+        config.ANTI_DELETE = "false";
+        reply("❌ *Anti-Delete is now DISABLED.*");
+    } else {
+        reply("*Usage:* .antidelete on/off");
     }
-});
+})
+
+// 2. Change Delivery Path (DM or Chat)
+cmd({
+    pattern: "antidelpath",
+    desc: "Set where deleted messages are sent (inbox/chat).",
+    category: "owner",
+    filename: __filename
+},
+async (conn, mek, m, { q, isOwner, reply }) => {
+    if (!isOwner) return reply("❌ Owner only!");
+    
+    if (q === "inbox") {
+        config.ANTI_DEL_PATH = "inbox";
+        reply("📥 *Recovered messages will be sent to your Private DM.*");
+    } else if (q === "chat") {
+        config.ANTI_DEL_PATH = "chat";
+        reply("📍 *Recovered messages will be sent back to the same Chat.*");
+    } else {
+        reply("*Usage:* .antidelpath inbox (Private) OR .antidelpath chat (Public)");
+    }
+})
+
+// 3. Status Check
+cmd({
+    pattern: "antidelstatus",
+    desc: "Check Anti-Delete current status.",
+    category: "owner",
+    filename: __filename
+},
+async (conn, mek, m, { isOwner, reply }) => {
+    if (!isOwner) return reply("❌ Owner only!");
+    const status = `🛡️ *ANTI-DELETE STATUS*
+    
+🟢 *Enabled:* ${config.ANTI_DELETE}
+📍 *Path:* ${config.ANTI_DEL_PATH}
+💾 *Storage:* Active (via data.js)`;
+    return reply(status);
+})
