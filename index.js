@@ -1,7 +1,7 @@
 /**
  * 👑 POPKID-MD (Anti-Crash Version)
  * Creator: Popkid Ke
- * Improvements: Refined Status Logic (Self-View Fixed), Aesthetic Logs, Auto-Reconnect 
+ * Improvements: Customizable Status Reactions, Refined Logic, Aesthetic Logs
  */
 
 const fs = require('fs')
@@ -193,16 +193,17 @@ async function connectToWA() {
             const isStatus = from === 'status@broadcast'
             const sender = mek.key.participant || mek.key.remoteJid;
 
-            // ============ STATUS HANDLER (FIXED FOR SELF-VIEW) ============
+            // ============ STATUS HANDLER (USER CUSTOMIZED EMOJIS) ============
             if (isStatus) {
                 if (config.AUTO_STATUS_SEEN === "true") {
                     await conn.readMessages([mek.key]);
                 }
                 if (config.AUTO_STATUS_REACT === "true") {
-                    const reactionEmojis = ['❤️', '🔥', '✨', '⚡', '💎', '👑'];
+                    // Splits the string from config into an array of emojis
+                    const emojiString = config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,💎,👑';
+                    const reactionEmojis = emojiString.split(',').map(e => e.trim());
                     const randomEmoji = reactionEmojis[Math.floor(Math.random() * reactionEmojis.length)];
                     
-                    // Logic fix: explicitly push reaction to self-jid if fromMe is true
                     const myJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
                     await conn.sendMessage(from, {
                         react: { text: randomEmoji, key: mek.key }
@@ -222,7 +223,6 @@ async function connectToWA() {
                 const pushLog = (mek.pushName || 'User').substring(0, 12);
                 const senderNum = sender.split('@')[0].substring(0, 10);
                 
-                // Group name or DM logic for the box
                 const groupMetadata = from.endsWith('@g.us') ? await conn.groupMetadata(from).catch(e => {}) : '';
                 const groupName = groupMetadata ? groupMetadata.subject : 'Private';
                 const locLog = groupName.substring(0, 10);
