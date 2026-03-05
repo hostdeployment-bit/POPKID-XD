@@ -1,25 +1,38 @@
 const { cmd } = require('../command');
+const { getAnti, setAnti } = require('../data/antidel');
 
 cmd({
     pattern: "antidelete",
-    desc: "Turn Anti-Delete ON or OFF",
-    category: "config",
+    alias: ['antidel', 'del'],
+    desc: "Toggle anti-delete feature",
+    category: "misc",
     filename: __filename
-}, async (conn, m, mek, { args, reply }) => {
+},
+async (conn, mek, m, { from, reply, text, isCreator }) => {
+    if (!isCreator) return reply('This command is only for the bot owner');
+    
     try {
-        if (!args[0]) return reply("📍 *Usage:* .antidelete on / off");
+        const currentStatus = await getAnti();
         
-        if (args[0] === "on") {
-            global.antidelete = true;
-            reply("✅ *POPKID XMD Anti-Delete is now ENABLED*");
-        } else if (args[0] === "off") {
-            global.antidelete = false;
-            reply("❌ *POPKID XMD Anti-Delete is now DISABLED*");
-        } else {
-            reply("❗ *Invalid choice. Use .antidelete on OR off*");
+        if (!text || text.toLowerCase() === 'status') {
+            return reply(`*AntiDelete Status:* ${currentStatus ? '✅ ON' : '❌ OFF'}\n\nUsage:\n• .antidelete on - Enable\n• .antidelete off - Disable`);
         }
-    } catch (err) {
-        console.error("TOGGLE ERROR:", err);
-        reply("❌ *Failed to change settings.*");
+        
+        const action = text.toLowerCase().trim();
+        
+        if (action === 'on') {
+            await setAnti(true);
+            return reply('✅ Anti-delete has been enabled');
+        } 
+        else if (action === 'off') {
+            await setAnti(false);
+            return reply('❌ Anti-delete has been disabled');
+        } 
+        else {
+            return reply('Invalid command. Usage:\n• .antidelete on\n• .antidelete off\n• .antidelete status');
+        }
+    } catch (e) {
+        console.error("Error in antidelete command:", e);
+        return reply("An error occurred while processing your request.");
     }
 });
