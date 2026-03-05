@@ -1,23 +1,36 @@
 const { cmd } = require('../command');
 const config = require('../config');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 cmd({
     pattern: "save",
     desc: "Saves the quoted status to the current chat",
     category: "main",
     filename: __filename
-}, async (conn, m, mek, { from, reply, quoted }) => {
+}, async (conn, m, mek, { from, reply }) => {
     try {
-        // 1. Check if there is a quoted message
-        if (!m.quoted) return reply("❌ *Please reply to a status image or video with .save*");
+        // 1. Properly catch the quoted message from a status
+        const quoted = m.quoted ? m.quoted : m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null;
+        if (!quoted) return reply("❌ *Please reply to a status image or video with .save*");
 
-        // 2. React to show the bot is working
+        // 2. Identify the media type correctly
+        const mime = quoted.mtype || quoted.type;
+        const isImage = mime === 'imageMessage';
+        const isVideo = mime === 'videoMessage';
+
+        if (!isImage && !isVideo) return reply("❌ *Please reply to an Image or Video status.*");
+
         await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
 
-        // 3. Download the media from the status
-        let media = await m.quoted.download();
+        // 3. The "Pro" Fix: Use the downloader with the specific message stream
+        const messageType = isImage ? 'image' : 'video';
+        const stream = await downloadContentFromMessage(quoted[mime] || quoted, messageType);
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
 
-        // 4. Define your signature style (Popkid Ke)
+        // 4. Style Settings (Your signature Popkid Ke style)
         const fakevCard = {
             key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
             message: {
@@ -46,25 +59,15 @@ cmd({
             }
         };
 
-        // 5. Determine if it's an image or video and send it
-        if (m.quoted.mtype === 'imageMessage') {
-            await conn.sendMessage(from, { 
-                image: media, 
-                caption: m.quoted.caption || "", 
-                contextInfo: newsletterContextInfo 
-            }, { quoted: fakevCard });
-        } else if (m.quoted.mtype === 'videoMessage') {
-            await conn.sendMessage(from, { 
-                video: media, 
-                caption: m.quoted.caption || "", 
-                contextInfo: newsletterContextInfo 
-            }, { quoted: fakevCard });
+        // 5. Send the buffer back to the chat
+        if (isImage) {
+            await conn.sendMessage(from, { image: buffer, caption: quoted.caption || "", contextInfo: newsletterContextInfo }, { quoted: fakevCard });
         } else {
-            reply("❌ *This is not a supported media status (Image/Video only).*");
+            await conn.sendMessage(from, { video: buffer, caption: quoted.caption || "", contextInfo: newsletterContextInfo }, { quoted: fakevCard });
         }
 
     } catch (err) {
-        console.error("FINAL SAVE ERROR:", err);
-        reply("❌ *Failed to download status. The media might have expired.*");
+        console.error("SAVE ERROR:", err);
+        reply("❌ *Failed to download status. Try again or check your bot logs.*");
     }
 });
