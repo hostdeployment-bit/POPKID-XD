@@ -1,31 +1,67 @@
 const { cmd } = require('../command');
-const { setAnti, getAnti } = require('../data/antidel');
-const { AntiDelete } = require('../lib/antidel');
+const { getAnti, setAnti } = require('../data/antidel');
 
 cmd({
     pattern: "antidelete",
-    alias: ["antidel"],
-    desc: "Toggle Antidelete for Groups and DMs",
-    category: "owner",
+    alias: ['antidel', 'del'],
+    desc: "Toggle anti-delete feature",
+    category: "misc",
     filename: __filename
-}, async (conn, m, mek, { from, reply, args }) => {
-    if (!args[0]) {
-        const status = await getAnti();
-        return reply(`📍 *Antidelete Status:* ${status ? 'ON' : 'OFF'}\nUsage: .antidelete on / off`);
-    }
+},
+async (conn, mek, m, { from, reply, text, isCreator, sender }) => {
+    if (!isCreator) return reply('❌ This command is only for the bot owner');
+    
+    // Newsletter configuration
+    const newsletterConfig = {
+        contextInfo: {
+            mentionedJid: [sender],
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: '120363382023564830@newsletter',
+                newsletterName: '𝘕𝘖𝘝𝘈 𝘟𝘔𝘋',
+                serverMessageId: 143
+            }
+        }
+    };
 
-    if (args[0] === "on") {
-        await setAnti(true);
-        return reply("🛡️ *Antidelete Enabled.* (Works for Groups & DMs)");
-    } else if (args[0] === "off") {
-        await setAnti(false);
-        return reply("🔓 *Antidelete Disabled.*");
+    try {
+        const currentStatus = await getAnti();
+        
+        if (!text || text.toLowerCase() === 'status') {
+            return await conn.sendMessage(from, {
+                text: `🔒 *AntiDelete Status*\n\nCurrent Status: ${currentStatus ? '✅ ON' : '❌ OFF'}\n\n*Usage:*\n• .antidelete on - Enable protection\n• .antidelete off - Disable protection\n\n⚡ Powered by 𝙽𝙾𝚅𝙰-𝚇𝙼𝙳`,
+                ...newsletterConfig
+            }, { quoted: mek });
+        }
+        
+        const action = text.toLowerCase().trim();
+        
+        if (action === 'on') {
+            await setAnti(true);
+            return await conn.sendMessage(from, {
+                text: '✅ *Anti-delete enabled*\n\nMessage deletion protection is now active!',
+                ...newsletterConfig
+            }, { quoted: mek });
+        } 
+        else if (action === 'off') {
+            await setAnti(false);
+            return await conn.sendMessage(from, {
+                text: '❌ *Anti-delete disabled*\n\nMessage deletion protection has been turned off.',
+                ...newsletterConfig
+            }, { quoted: mek });
+        } 
+        else {
+            return await conn.sendMessage(from, {
+                text: '⚠️ *Invalid command*\n\n*Usage:*\n• .antidelete on - Enable protection\n• .antidelete off - Disable protection\n• .antidelete status - Check current status',
+                ...newsletterConfig
+            }, { quoted: mek });
+        }
+    } catch (e) {
+        console.error("Error in antidelete command:", e);
+        return await conn.sendMessage(from, {
+            text: '❌ *Error occurred*\n\nFailed to process your request. Please try again later.',
+            ...newsletterConfig
+        }, { quoted: mek });
     }
-});
-
-// The actual listener for deletions
-cmd({
-    on: "messages.update"
-}, async (conn, updates) => {
-    await AntiDelete(conn, updates);
 });
