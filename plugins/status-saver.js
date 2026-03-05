@@ -1,77 +1,52 @@
-const { cmd } = require("../command");
-const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+const { cmd } = require('../command')
+
+/**
+ * 📥 POPKID-MD Status Saver
+ * Usage: Reply to a status with .save or .get
+ */
 
 cmd({
-  pattern: "save",
-  alias: ["sendme", "send"],
-  react: "📤",
-  desc: "Forward quoted media back to yourself",
-  category: "utility",
-  filename: __filename
-}, async (client, message, match, { from }) => {
-  try {
+    pattern: "save",
+    alias: ["get", "download"],
+    desc: "Save the status update you replied to.",
+    category: "main",
+    filename: __filename
+},
+async (conn, mek, m, { from, reply }) => {
+    try {
+        // 1. Check if the user is replying to a message
+        if (!m.quoted) return reply("❌ Please reply to the status update you want to save.");
 
-    if (!match.quoted) {
-      return await client.sendMessage(from, {
-        text: "🍁 *Reply to an image, video, or audio message.*"
-      }, { quoted: message });
+        // 2. Check if the quoted message is from a status broadcast
+        // Note: fromMe check is removed so you can save your own or others' statuses
+        if (m.quoted.chat !== 'status@broadcast') {
+            return reply("❌ This command only works when replying to a WhatsApp Status.");
+        }
+
+        reply("⏳ *Downloading status...*");
+
+        // 3. Download the media from the quoted message
+        const media = await m.quoted.download();
+        const type = m.quoted.mtype; // imageMessage, videoMessage, etc.
+
+        // 4. Send the media back to the current chat
+        if (type === 'imageMessage') {
+            await conn.sendMessage(from, { 
+                image: media, 
+                caption: m.quoted.text || "✅ Status Saved by POPKID-MD" 
+            }, { quoted: mek });
+        } else if (type === 'videoMessage') {
+            await conn.sendMessage(from, { 
+                video: media, 
+                caption: m.quoted.text || "✅ Status Saved by POPKID-MD",
+                mimetype: 'video/mp4'
+            }, { quoted: mek });
+        } else {
+            return reply("❌ Unsupported status type (only images and videos are supported).");
+        }
+
+    } catch (e) {
+        console.error("Status Saver Error: ", e);
+        reply("❌ Failed to save status. Make sure the status hasn't expired.");
     }
-
-    const quotedMsg = match.quoted;
-    const msgType = Object.keys(quotedMsg.message)[0];
-
-    // Only allow supported media types
-    if (!["imageMessage", "videoMessage", "audioMessage"].includes(msgType)) {
-      return await client.sendMessage(from, {
-        text: "❌ Only *image, video, and audio* messages are supported."
-      }, { quoted: message });
-    }
-
-    // Download media properly (New Baileys Method)
-    const stream = await downloadContentFromMessage(
-      quotedMsg.message[msgType],
-      msgType.replace("Message", "")
-    );
-
-    let buffer = Buffer.from([]);
-    for await (const chunk of stream) {
-      buffer = Buffer.concat([buffer, chunk]);
-    }
-
-    // Prepare outgoing message
-    let sendContent = {};
-
-    if (msgType === "imageMessage") {
-      sendContent = {
-        image: buffer,
-        caption: quotedMsg.message.imageMessage.caption || "",
-        mimetype: "image/jpeg"
-      };
-    }
-
-    if (msgType === "videoMessage") {
-      sendContent = {
-        video: buffer,
-        caption: quotedMsg.message.videoMessage.caption || "",
-        mimetype: "video/mp4"
-      };
-    }
-
-    if (msgType === "audioMessage") {
-      sendContent = {
-        audio: buffer,
-        mimetype: "audio/mp4",
-        ptt: quotedMsg.message.audioMessage.ptt || false
-      };
-    }
-
-    await client.sendMessage(from, sendContent, { quoted: message });
-
-  } catch (error) {
-    console.error("🔥 SEND COMMAND ERROR:", error);
-
-    await client.sendMessage(from, {
-      text: "❌ *Failed to forward media!*\n\n" + error.message
-    }, { quoted: message });
-  }
-});
+})
