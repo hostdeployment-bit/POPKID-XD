@@ -1,83 +1,82 @@
-const config = require('../config');
-const axios = require('axios');
-const { cmd } = require('../command');
+const { cmd } = require('../command')
+const { fetchJson, downloadMediaMessage } = require('../lib')
+const axios = require('axios')
+const FormData = require('form-data')
+const fs = require('fs')
+
+/**
+ * 🎵 POPKID-MD Music Identifier (Pro Version)
+ * Works with: YouTube Links OR Replying to Audio/Voice Notes.
+ */
 
 cmd({
-  pattern: 'music',
-  alias: ['whatmusic', 'shazam'],
-  desc: 'Identify music from audio, video, or URL',
-  category: 'tools',
-  filename: __filename
-}, async (conn, mek, m, { from, args, reply }) => {
-  try {
-    let audioUrl;
+    pattern: "whatmusic",
+    alias: ["findmusic", "shazam"],
+    desc: "Identify music from a URL or an Audio reply.",
+    category: "search",
+    filename: __filename
+},
+async (conn, mek, m, { from, q, reply, isOwner }) => {
+    try {
+        let musicUrl = q;
 
-    // 1️⃣ If user replies to audio or video
-    if (m.quoted && (m.quoted.audio || m.quoted.video)) {
-      await conn.sendMessage(from, {
-        react: { text: '🎧', key: mek.key }
-      });
-
-      const media = await m.quoted.download();
-      if (!media) return reply('❌ *Failed to download replied media*');
-
-      // Upload media to get public URL
-      audioUrl = await conn.uploadFile(media);
-
-    }
-    // 2️⃣ If user provides direct URL
-    else if (args[0]) {
-      audioUrl = args[0];
-    }
-    // 3️⃣ Nothing provided
-    else {
-      return reply(
-        '❌ *Reply to an audio/video or provide a URL*\n\n' +
-        'Example:\n.music <audio_url>'
-      );
-    }
-
-    const api = `https://api.deline.web.id/tools/whatmusic?url=${encodeURIComponent(audioUrl)}`;
-
-    const { data } = await axios.get(api);
-
-    if (!data.status || !data.result) {
-      return reply('❌ *Unable to identify this music*');
-    }
-
-    const { title, artists } = data.result;
-
-    const caption = `
-╭═══〘 *MUSIC IDENTIFIED* 〙═══⊷
-┃❍ *Title:* ${title}
-┃❍ *Artist:* ${artists}
-╰═════════════════════════⊷
-
-> *${config.BOT_NAME || 'POP KID-MD'}*
-> Powered by Deline API
-    `.trim();
-
-    await conn.sendMessage(from, {
-      text: caption,
-      contextInfo: {
-        forwardingScore: 5,
-        isForwarded: true,
-        externalAdReply: {
-          title: title,
-          body: artists,
-          sourceUrl: audioUrl,
-          mediaType: 1,
-          renderLargerThumbnail: true
+        // 1. Check if replying to Audio/Video
+        if (m.quoted && (m.quoted.mtype === 'audioMessage' || m.quoted.mtype === 'videoMessage')) {
+            reply("📥 *Processing audio, please wait...*");
+            
+            // Download the audio
+            const buffer = await downloadMediaMessage(m.quoted, 'temp_shazam');
+            
+            // Upload to a temporary hosting (Catbox) to get a URL for the API
+            const bodyForm = new FormData();
+            bodyForm.append("fileToUpload", buffer, { filename: "music.mp3" });
+            bodyForm.append("reqtype", "fileupload");
+            
+            const uploadRes = await axios.post("https://catbox.moe/user/api.php", bodyForm, {
+                headers: { ...bodyForm.getHeaders() }
+            });
+            
+            musicUrl = uploadRes.data; // This is now your audio link
         }
-      }
-    }, { quoted: mek });
 
-    await conn.sendMessage(from, {
-      react: { text: '✅', key: mek.key }
-    });
+        // 2. Validate we have a URL now
+        if (!musicUrl) {
+            return reply("⚠️ Please provide a YouTube URL or reply to an audio/voice note with *.whatmusic*");
+        }
 
-  } catch (e) {
-    console.error(e);
-    reply(`❌ Error: ${e.message}`);
-  }
-});
+        reply("🔍 *Analyzing music details...*");
+
+        // 3. Call the API
+        const apiUrl = `https://api-faa.my.id/faa/whatmusic?url=${encodeURIComponent(musicUrl)}`;
+        const data = await fetchJson(apiUrl);
+
+        if (!data || !data.status || !data.result) {
+            return reply("❌ Could not identify any music. Make sure the audio is clear.");
+        }
+
+        const res = data.result;
+
+        // 4. Format the Result
+        let resultMsg = `🎵 *MUSIC IDENTIFIED* 🎵\n\n`;
+        resultMsg += `📌 *Title:* ${res.title}\n`;
+        resultMsg += `👤 *Channel/Artist:* ${res.channel}\n`;
+        resultMsg += `🕒 *Duration:* ${res.duration}\n`;
+        resultMsg += `👁️ *Views:* ${res.views.toLocaleString()}\n`;
+        resultMsg += `📅 *Uploaded:* ${res.uploadedAt}\n`;
+        resultMsg += `🔗 *Watch:* ${res.url}\n\n`;
+        resultMsg += `> *© POPKID-MD BY POPKID KE*`;
+
+        // 5. Send with Thumbnail
+        await conn.sendMessage(from, { 
+            image: { url: res.thumbnail }, 
+            caption: resultMsg 
+        }, { quoted: mek });
+
+        // Cleanup temp files if any
+        if (fs.existsSync('temp_shazam.mp3')) fs.unlinkSync('temp_shazam.mp3');
+
+    } catch (e) {
+        console.error("Music Finder Error: ", e);
+        reply("❌ An error occurred. Please ensure you are replying to a valid audio file.");
+    }
+})
