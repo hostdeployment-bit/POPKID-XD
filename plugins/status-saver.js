@@ -1,37 +1,71 @@
 const { cmd } = require('../command')
 
+/**
+ * 📥 POPKID-MD Status & Message Saver
+ * Adapted from context to support all media types and private delivery.
+ */
+
 cmd({
     pattern: "save",
-    alias: ["get"],
-    desc: "Save status updates",
-    category: "main",
+    aliases: ["sv", "s", "sav", "get"],
+    react: "⚡",
+    desc: "Save status or messages (Images, Videos, Audio, Stickers, Text).",
+    category: "owner",
     filename: __filename
 },
-async (conn, mek, m, { from, reply }) => {
-    try {
-        // Check if there is a quoted message
-        if (!m.quoted) return reply("❌ Please reply to a status update.");
+async (conn, mek, m, { from, reply, isOwner, sender, body }) => {
+    // 1. Owner Security Check
+    if (!isOwner) return reply(`❌ Owner Only Command!`);
 
-        // Check if the quoted message actually contains media
-        const mime = m.quoted.mimetype || "";
-        if (!mime) return reply("❌ No media found to save.");
+    // 2. Extract Quoted Message
+    const quotedMsg = mek.message?.extendedTextMessage?.contextInfo?.quotedMessage || 
+                     mek.message?.imageMessage?.contextInfo?.quotedMessage || 
+                     mek.message?.videoMessage?.contextInfo?.quotedMessage;
 
-        reply("⏳ *Downloading status...*");
-
-        // Download using the internal library method
-        const media = await m.quoted.download();
-        if (!media) throw new Error("Download failed");
-
-        const isVideo = mime.includes('video');
-        
-        await conn.sendMessage(from, { 
-            [isVideo ? 'video' : 'image']: media, 
-            caption: m.quoted.text || "✅ Status Saved",
-            mimetype: mime
-        }, { quoted: mek });
-
-    } catch (e) {
-        console.error(e);
-        reply("❌ *Failed to save media!*\n\nError: " + e.message);
+    if (!quotedMsg) {
+        return reply(`⚠️ Please reply to/quote a message.`);
     }
-})
+
+    try {
+        let mediaData;
+        // Use the internal download function from your sms utility
+        const q = m.quoted ? m.quoted : m;
+
+        // 3. Media Extraction Logic based on Type
+        if (quotedMsg.imageMessage) {
+            const buffer = await q.download();
+            mediaData = { image: buffer, caption: quotedMsg.imageMessage.caption || "" };
+        } 
+        else if (quotedMsg.videoMessage) {
+            const buffer = await q.download();
+            mediaData = { video: buffer, caption: quotedMsg.videoMessage.caption || "" };
+        } 
+        else if (quotedMsg.audioMessage) {
+            const buffer = await q.download();
+            mediaData = { audio: buffer, mimetype: "audio/mp4" };
+        } 
+        else if (quotedMsg.stickerMessage) {
+            const buffer = await q.download();
+            mediaData = { sticker: buffer };
+        } 
+        else if (quotedMsg.conversation || quotedMsg.extendedTextMessage?.text) {
+            const text = quotedMsg.conversation || quotedMsg.extendedTextMessage.text;
+            mediaData = { text: text };
+        } 
+        else {
+            return reply(`❌ Unsupported message type.`);
+        }
+
+        // 4. Send the recovered data to your Private DM (sender)
+        await conn.sendMessage(sender, mediaData, { quoted: mek });
+        
+        // 5. Success Reaction
+        if (typeof conn.sendMessage === 'function') {
+            await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
+        }
+
+    } catch (error) {
+        console.error("Save Error:", error);
+        await reply(`❌ Failed to save. Error: ${error.message}`);
+    }
+});
