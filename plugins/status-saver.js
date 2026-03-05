@@ -1,52 +1,37 @@
 const { cmd } = require('../command')
 
-/**
- * 📥 POPKID-MD Status Saver
- * Usage: Reply to a status with .save or .get
- */
-
 cmd({
     pattern: "save",
-    alias: ["get", "download"],
-    desc: "Save the status update you replied to.",
+    alias: ["get"],
+    desc: "Save status updates",
     category: "main",
     filename: __filename
 },
 async (conn, mek, m, { from, reply }) => {
     try {
-        // 1. Check if the user is replying to a message
-        if (!m.quoted) return reply("❌ Please reply to the status update you want to save.");
+        // Check if there is a quoted message
+        if (!m.quoted) return reply("❌ Please reply to a status update.");
 
-        // 2. Check if the quoted message is from a status broadcast
-        // Note: fromMe check is removed so you can save your own or others' statuses
-        if (m.quoted.chat !== 'status@broadcast') {
-            return reply("❌ This command only works when replying to a WhatsApp Status.");
-        }
+        // Check if the quoted message actually contains media
+        const mime = m.quoted.mimetype || "";
+        if (!mime) return reply("❌ No media found to save.");
 
         reply("⏳ *Downloading status...*");
 
-        // 3. Download the media from the quoted message
+        // Download using the internal library method
         const media = await m.quoted.download();
-        const type = m.quoted.mtype; // imageMessage, videoMessage, etc.
+        if (!media) throw new Error("Download failed");
 
-        // 4. Send the media back to the current chat
-        if (type === 'imageMessage') {
-            await conn.sendMessage(from, { 
-                image: media, 
-                caption: m.quoted.text || "✅ Status Saved by POPKID-MD" 
-            }, { quoted: mek });
-        } else if (type === 'videoMessage') {
-            await conn.sendMessage(from, { 
-                video: media, 
-                caption: m.quoted.text || "✅ Status Saved by POPKID-MD",
-                mimetype: 'video/mp4'
-            }, { quoted: mek });
-        } else {
-            return reply("❌ Unsupported status type (only images and videos are supported).");
-        }
+        const isVideo = mime.includes('video');
+        
+        await conn.sendMessage(from, { 
+            [isVideo ? 'video' : 'image']: media, 
+            caption: m.quoted.text || "✅ Status Saved",
+            mimetype: mime
+        }, { quoted: mek });
 
     } catch (e) {
-        console.error("Status Saver Error: ", e);
-        reply("❌ Failed to save status. Make sure the status hasn't expired.");
+        console.error(e);
+        reply("❌ *Failed to save media!*\n\nError: " + e.message);
     }
 })
