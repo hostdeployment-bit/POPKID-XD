@@ -1,116 +1,109 @@
 const { cmd } = require("../command");
 const config = require("../config");
 
-// Anti-Delete Event Handler
-// This listens for message updates (like deletions)
-cmd({ on: "body" }, async (client, message, chat) => {
+// ================================
+// ANTI DELETE EVENT LISTENER
+// ================================
+
+cmd({ on: "messages.update" }, async (client, updates) => {
     try {
-        client.ev.on('messages.update', async (updates) => {
-            for (const update of updates) {
-                if (!config.ANTI_DELETE || !update.update.message === null) return;
+        if (!config.ANTI_DELETE) return;
 
-                // Check if the update is a "delete for everyone" action
-                if (update.update.protocolMessage && update.update.protocolMessage.type === 0) {
-                    const key = update.update.protocolMessage.key;
-                    const originalMsg = await client.loadMessage(key.remoteJid, key.id);
+        for (const update of updates) {
 
-                    if (!originalMsg) return; // Can't restore if not in cache
+            if (!update.update) continue;
 
-                    const sender = key.participant || key.remoteJid;
-                    const caption = `*🚫 ANTI-DELETE DETECTED 🚫*\n\n` +
-                                    `*👤 From:* @${sender.split("@")[0]}\n` +
-                                    `*🕒 Time:* ${new Date().toLocaleString()}\n\n` +
-                                    `_Restoring deleted message..._`;
+            const protocol = update.update.protocolMessage;
 
-                    // Forward or re-send the deleted content
-                    await client.sendMessage(client.user.id, { 
-                        text: caption, 
-                        mentions: [sender] 
-                    });
-                    
-                    await client.copyNForward(client.user.id, originalMsg, true);
-                }
+            // Detect delete for everyone
+            if (protocol && protocol.type === 0) {
+
+                const key = protocol.key;
+
+                // Try loading original message from store
+                const originalMsg = await client.loadMessage?.(key.remoteJid, key.id);
+
+                if (!originalMsg) return;
+
+                const sender = key.participant || key.remoteJid;
+
+                const caption =
+`*🚫 ANTI DELETE DETECTED 🚫*
+
+👤 *User:* @${sender.split("@")[0]}
+🕒 *Time:* ${new Date().toLocaleString()}
+
+_Recovered deleted message below_`;
+
+                // Send alert
+                await client.sendMessage(client.user.id, {
+                    text: caption,
+                    mentions: [sender]
+                });
+
+                // Forward deleted message
+                await client.copyNForward(
+                    client.user.id,
+                    originalMsg,
+                    true
+                );
             }
-        });
-    } catch (e) {
-        console.error("Anti-delete error:", e);
+        }
+
+    } catch (err) {
+        console.log("AntiDelete Error:", err);
     }
 });
 
-// Anti-Delete Toggle Command
+
+// ================================
+// ANTI DELETE TOGGLE COMMAND
+// ================================
+
 cmd({
     pattern: "antidelete",
-    alias: ["nodelete", "atd"],
-    desc: "Toggle anti-delete feature",
+    alias: ["nodelete","atd"],
+    desc: "Toggle Anti Delete",
     category: "owner",
     react: "🗑️",
     filename: __filename,
     fromMe: true
 },
-async (client, message, m, { isOwner, from, sender, args }) => {
+async (client, message, m, { args, from }) => {
+
     try {
-        if (!isOwner) {
-            return client.sendMessage(from, { 
-                text: "🚫 Owner-only command",
-                mentions: [sender]
-            }, { quoted: message });
+
+        const action = args[0]?.toLowerCase();
+
+        if (action === "on") {
+            config.ANTI_DELETE = true;
+
+            return await client.sendMessage(from,{
+                text: "✅ *Anti Delete Enabled*\nDeleted messages will be restored."
+            },{ quoted: message });
         }
 
-        const action = args[0]?.toLowerCase() || 'status';
-        let statusText, reaction = "🗑️", additionalInfo = "";
+        if (action === "off") {
+            config.ANTI_DELETE = false;
 
-        switch (action) {
-            case 'on':
-                if (config.ANTI_DELETE) {
-                    statusText = "Anti-Delete is already *enabled* ✅";
-                    reaction = "ℹ️";
-                } else {
-                    config.ANTI_DELETE = true;
-                    statusText = "Anti-Delete has been *enabled*!";
-                    reaction = "✅";
-                    additionalInfo = "Deleted messages will be sent to your DM 🛡️";
-                }
-                break;
-                
-            case 'off':
-                if (!config.ANTI_DELETE) {
-                    statusText = "Anti-Delete is already *disabled* ❌";
-                    reaction = "ℹ️";
-                } else {
-                    config.ANTI_DELETE = false;
-                    statusText = "Anti-Delete has been *disabled* 📛";
-                    reaction = "❌";
-                    additionalInfo = "Deleted messages will no longer be captured";
-                }
-                break;
-                
-            default:
-                statusText = `Anti-Delete Status: ${config.ANTI_DELETE ? "✅ *ENABLED*" : "❌ *DISABLED*"}`;
-                additionalInfo = config.ANTI_DELETE ? "Monitoring deletions..." : "Not monitoring";
-                break;
+            return await client.sendMessage(from,{
+                text: "❌ *Anti Delete Disabled*"
+            },{ quoted: message });
         }
 
-        await client.sendMessage(from, {
-            image: { url: "https://files.catbox.moe/aapw1p.png" },
-            caption: `${statusText}\n\n${additionalInfo}\n\n_Nova-Xmd_`,
-            contextInfo: {
-                mentionedJid: [sender],
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363382023564830@newsletter',
-                    newsletterName: 'Nova-Xmd',
-                    serverMessageId: 143
-                }
-            }
-        }, { quoted: message });
+        return await client.sendMessage(from,{
+            text: `🗑️ *Anti Delete Status*\n\n${
+                config.ANTI_DELETE ? "✅ Enabled" : "❌ Disabled"
+            }`
+        },{ quoted: message });
 
-        await client.sendMessage(from, {
-            react: { text: reaction, key: message.key }
-        });
+    } catch(e) {
 
-    } catch (error) {
-        console.error("Anti-delete command error:", error);
-        await client.sendMessage(from, { text: `⚠️ Error: ${error.message}` });
+        console.log("Command Error:",e)
+
+        await client.sendMessage(from,{
+            text:"⚠️ Error occurred."
+        })
     }
+
 });
