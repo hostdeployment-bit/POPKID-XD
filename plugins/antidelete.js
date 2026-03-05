@@ -91,7 +91,7 @@ async (client, message, m, { isOwner, from, sender, args }) => {
         }
 
         await client.sendMessage(from, {
-            image: { url: "https://files.catbox.moe/ktr7qs.jpg" },
+            image: { url: "https://files.catbox.moe/aapw1p.png" },
             caption: `${statusText}\n\n${additionalInfo}\n\n_Nova-Xmd_`,
             contextInfo: {
                 mentionedJid: [sender],
