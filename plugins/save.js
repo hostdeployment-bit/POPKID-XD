@@ -6,21 +6,20 @@ cmd({
     desc: "Saves the quoted status to the current chat",
     category: "main",
     filename: __filename
-}, async (conn, m, mek, { from, reply }) => {
+}, async (conn, m, mek, { from, reply, quoted }) => {
     try {
-        // More robust check for quoted messages
-        const quoted = m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null;
-        
-        if (!quoted) return reply("❌ *Please reply to a status image or video with .save*");
+        // 1. Check if there is a quoted message
+        if (!m.quoted) return reply("❌ *Please reply to a status image or video with .save*");
 
+        // 2. React to show the bot is working
         await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
 
+        // 3. Download the media from the status
+        let media = await m.quoted.download();
+
+        // 4. Define your signature style (Popkid Ke)
         const fakevCard = {
-            key: {
-                fromMe: false,
-                participant: "0@s.whatsapp.net",
-                remoteJid: "status@broadcast"
-            },
+            key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
             message: {
                 contactMessage: {
                     displayName: "Popkid Ke",
@@ -47,14 +46,25 @@ cmd({
             }
         };
 
-        // Use copyNForward to ensure the media is captured and re-sent correctly
-        await conn.copyNForward(from, m.quoted ? m.quoted.fakeObj : mek, false, { 
-            contextInfo: newsletterContextInfo, 
-            quoted: fakevCard 
-        });
+        // 5. Determine if it's an image or video and send it
+        if (m.quoted.mtype === 'imageMessage') {
+            await conn.sendMessage(from, { 
+                image: media, 
+                caption: m.quoted.caption || "", 
+                contextInfo: newsletterContextInfo 
+            }, { quoted: fakevCard });
+        } else if (m.quoted.mtype === 'videoMessage') {
+            await conn.sendMessage(from, { 
+                video: media, 
+                caption: m.quoted.caption || "", 
+                contextInfo: newsletterContextInfo 
+            }, { quoted: fakevCard });
+        } else {
+            reply("❌ *This is not a supported media status (Image/Video only).*");
+        }
 
     } catch (err) {
-        console.error("SAVE ERROR:", err);
-        reply("❌ *Error: Could not process status.*");
+        console.error("FINAL SAVE ERROR:", err);
+        reply("❌ *Failed to download status. The media might have expired.*");
     }
 });
