@@ -1,8 +1,9 @@
 const { cmd } = require('../command')
+const { downloadMediaMessage } = require('../lib') // Import from your lib folder
 
 /**
  * 📥 POPKID-MD FINAL STATUS SAVER
- * Fixed: Uses working download() method and private delivery
+ * Specifically fixed for your lib/index.js setup
  */
 
 cmd({
@@ -14,7 +15,7 @@ cmd({
     filename: __filename
 },
 async (conn, mek, m, { from, reply, isOwner, sender }) => {
-    // Owner Security
+    // Owner Security Check
     if (!isOwner) return reply(`❌ Owner Only Command!`);
 
     // Check for quoted status/message
@@ -22,35 +23,38 @@ async (conn, mek, m, { from, reply, isOwner, sender }) => {
 
     try {
         let mediaData;
-        const q = m.quoted; // Uses internal sms utility
+        const q = m.quoted;
 
-        // Validate if media exists
-        if (!q.mtype || q.mtype === 'conversation') {
+        // 1. Handle Plain Text Status/Messages
+        if (!q.mtype || q.mtype === 'conversation' || q.mtype === 'extendedTextMessage') {
              if (q.text) {
                  return await conn.sendMessage(sender, { text: q.text }, { quoted: mek });
              }
-             return reply("❌ No media found to save.");
+             return reply("❌ No content found to save.");
         }
 
-        // Processing Media
-        if (['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage'].includes(q.mtype)) {
-            const buffer = await q.download(); // Use internal download utility
-            
-            if (q.mtype === 'imageMessage') {
-                mediaData = { image: buffer, caption: q.text || "✅ Status Saved" };
-            } else if (q.mtype === 'videoMessage') {
-                mediaData = { video: buffer, caption: q.text || "✅ Status Saved", mimetype: 'video/mp4' };
-            } else if (q.mtype === 'audioMessage') {
-                mediaData = { audio: buffer, mimetype: "audio/mp4" };
-            } else if (q.mtype === 'stickerMessage') {
-                mediaData = { sticker: buffer };
-            }
+        // 2. Handle Media (Images, Videos, Audio, Stickers)
+        // Use downloadMediaMessage from your lib as exported in lib/index.js
+        const buffer = await downloadMediaMessage(q); 
+        
+        if (!buffer) return reply("❌ Failed to download media.");
+
+        if (q.mtype === 'imageMessage') {
+            mediaData = { image: buffer, caption: q.text || "✅ Status Saved" };
+        } else if (q.mtype === 'videoMessage') {
+            mediaData = { video: buffer, caption: q.text || "✅ Status Saved", mimetype: 'video/mp4' };
+        } else if (q.mtype === 'audioMessage') {
+            mediaData = { audio: buffer, mimetype: "audio/mp4" };
+        } else if (q.mtype === 'stickerMessage') {
+            mediaData = { sticker: buffer };
+        } else {
+            return reply(`❌ Unsupported message type: ${q.mtype}`);
         }
 
-        // Send to Private DM
+        // 3. Send to your Private DM
         await conn.sendMessage(sender, mediaData, { quoted: mek });
         
-        // Success Reaction
+        // 4. Success Reaction
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (error) {
