@@ -22,15 +22,24 @@ cmd({
 
         await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
 
-        // 3. The "Pro" Fix: Use the downloader with the specific message stream
-        const messageType = isImage ? 'image' : 'video';
-        const stream = await downloadContentFromMessage(quoted[mime] || quoted, messageType);
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) {
-            buffer = Buffer.concat([buffer, chunk]);
+        // --- 3. THE PRO THUMBNAIL FIX ---
+        // To fix the "big black image" on videos, we must download the thumbnail first.
+        // For statuses, the correct thumbnail is usually found at quoted.jpegThumbnail
+        let thumbnail = null;
+        if (quoted.jpegThumbnail) {
+            // Convert the thumbnail to a Buffer
+            thumbnail = Buffer.from(quoted.jpegThumbnail);
         }
 
-        // 4. Style Settings (Your signature Popkid Ke style)
+        // 4. Download the actual media stream (Image or Video)
+        const messageType = isImage ? 'image' : 'video';
+        const stream = await downloadContentFromMessage(quoted[mime] || quoted, messageType);
+        let mediaBuffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            mediaBuffer = Buffer.concat([mediaBuffer, chunk]);
+        }
+
+        // 5. Define your signature style (Popkid Ke)
         const fakevCard = {
             key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
             message: {
@@ -52,18 +61,24 @@ cmd({
             externalAdReply: {
                 title: "POPKID XMD STATUS SAVER",
                 body: "𝐒𝐓𝐀𝐓𝐔𝐒 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃 ⚡",
-                mediaType: 1,
-                thumbnailUrl: "https://files.catbox.moe/aapw1p.png",
+                mediaType: isVideo ? 2 : 1, // Set to 2 if it's a video for correct rendering
+                thumbnailUrl: "https://files.catbox.moe/aapw1p.png", // This is the image used for the link context
                 renderLargerThumbnail: true,
                 sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
             }
         };
 
-        // 5. Send the buffer back to the chat
+        // 6. Send the buffer back to the chat WITH the correct thumbnail attached
         if (isImage) {
-            await conn.sendMessage(from, { image: buffer, caption: quoted.caption || "", contextInfo: newsletterContextInfo }, { quoted: fakevCard });
+            await conn.sendMessage(from, { image: mediaBuffer, caption: quoted.caption || "", contextInfo: newsletterContextInfo }, { quoted: fakevCard });
         } else {
-            await conn.sendMessage(from, { video: buffer, caption: quoted.caption || "", contextInfo: newsletterContextInfo }, { quoted: fakevCard });
+            // For videos, attaching the 'jpegThumbnail' buffer explicitly makes it small
+            await conn.sendMessage(from, { 
+                video: mediaBuffer, 
+                caption: quoted.caption || "", 
+                jpegThumbnail: thumbnail, // <--- This forces the thumbnail to be small
+                contextInfo: newsletterContextInfo 
+            }, { quoted: fakevCard });
         }
 
     } catch (err) {
