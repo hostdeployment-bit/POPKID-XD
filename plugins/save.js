@@ -6,15 +6,15 @@ cmd({
     desc: "Saves the quoted status to the current chat",
     category: "main",
     filename: __filename
-}, async (conn, m, mek, { from, reply, quoted }) => {
+}, async (conn, m, mek, { from, reply }) => {
     try {
-        // Check if the user is actually replying to a status/message
+        // More robust check for quoted messages
+        const quoted = m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null;
+        
         if (!quoted) return reply("❌ *Please reply to a status image or video with .save*");
 
-        // React to show processing
         await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
 
-        // Define the fakevCard (Popkid Ke)
         const fakevCard = {
             key: {
                 fromMe: false,
@@ -29,7 +29,6 @@ cmd({
             }
         };
 
-        // Newsletter and link preview context
         const newsletterContextInfo = {
             forwardingScore: 999,
             isForwarded: true,
@@ -48,14 +47,14 @@ cmd({
             }
         };
 
-        // Forward the quoted content (Image/Video) with the new context
-        await conn.sendMessage(from, { 
-            forward: quoted, 
-            contextInfo: newsletterContextInfo 
-        }, { quoted: fakevCard });
+        // Use copyNForward to ensure the media is captured and re-sent correctly
+        await conn.copyNForward(from, m.quoted ? m.quoted.fakeObj : mek, false, { 
+            contextInfo: newsletterContextInfo, 
+            quoted: fakevCard 
+        });
 
     } catch (err) {
         console.error("SAVE ERROR:", err);
-        reply("❌ *Failed to save status. Ensure you are replying to a media file.*");
+        reply("❌ *Error: Could not process status.*");
     }
 });
