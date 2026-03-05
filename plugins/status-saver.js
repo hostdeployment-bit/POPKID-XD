@@ -1,10 +1,7 @@
 const { cmd } = require('../command')
-const { downloadMediaMessage } = require('../lib') // Import from your lib folder
-
-/**
- * 📥 POPKID-MD FINAL STATUS SAVER
- * Specifically fixed for your lib/index.js setup
- */
+const { downloadMediaMessage } = require('../lib') 
+const path = require('path')
+const fs = require('fs')
 
 cmd({
     pattern: "save",
@@ -14,51 +11,54 @@ cmd({
     category: "owner",
     filename: __filename
 },
-async (conn, mek, m, { from, reply, isOwner, sender }) => {
-    // Owner Security Check
+async (conn, mek, m, { from, reply, isOwner }) => {
     if (!isOwner) return reply(`❌ Owner Only Command!`);
-
-    // Check for quoted status/message
-    if (!m.quoted) return reply(`⚠️ Please reply to/quote a status or message.`);
+    if (!m.quoted) return reply(`⚠️ Please reply to a status or message.`);
 
     try {
-        let mediaData;
         const q = m.quoted;
+        const myJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
 
-        // 1. Handle Plain Text Status/Messages
+        // 1. Handle Text
         if (!q.mtype || q.mtype === 'conversation' || q.mtype === 'extendedTextMessage') {
              if (q.text) {
-                 return await conn.sendMessage(sender, { text: q.text }, { quoted: mek });
+                 await conn.sendMessage(myJid, { text: q.text });
+                 return await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
              }
-             return reply("❌ No content found to save.");
         }
 
-        // 2. Handle Media (Images, Videos, Audio, Stickers)
-        // Use downloadMediaMessage from your lib as exported in lib/index.js
-        const buffer = await downloadMediaMessage(q); 
+        // 2. Handle Media using your lib/msg.js logic
+        // We create a unique filename based on the message ID
+        const tempName = path.join(__dirname, '../' + q.id);
         
-        if (!buffer) return reply("❌ Failed to download media.");
+        // This calls your specific downloadMediaMessage(m, filename) function
+        const buffer = await downloadMediaMessage(q, tempName); 
 
+        if (!buffer) return reply("❌ Download failed.");
+
+        let mediaData = {};
         if (q.mtype === 'imageMessage') {
-            mediaData = { image: buffer, caption: q.text || "✅ Status Saved" };
+            mediaData = { image: buffer, caption: q.text || "✅ Saved" };
         } else if (q.mtype === 'videoMessage') {
-            mediaData = { video: buffer, caption: q.text || "✅ Status Saved", mimetype: 'video/mp4' };
+            mediaData = { video: buffer, caption: q.text || "✅ Saved", mimetype: 'video/mp4' };
         } else if (q.mtype === 'audioMessage') {
             mediaData = { audio: buffer, mimetype: "audio/mp4" };
         } else if (q.mtype === 'stickerMessage') {
             mediaData = { sticker: buffer };
-        } else {
-            return reply(`❌ Unsupported message type: ${q.mtype}`);
         }
 
         // 3. Send to your Private DM
-        await conn.sendMessage(sender, mediaData, { quoted: mek });
+        await conn.sendMessage(myJid, mediaData);
         
-        // 4. Success Reaction
+        // 4. Cleanup: Delete the temp file from your server so it doesn't get full
+        const extMap = { imageMessage: '.jpg', videoMessage: '.mp4', audioMessage: '.mp3', stickerMessage: '.webp' };
+        const fullPath = tempName + (extMap[q.mtype] || '');
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (error) {
         console.error("Save Error:", error);
-        await reply(`❌ Failed to save. Error: ${error.message}`);
+        await reply(`❌ Error: ${error.message}`);
     }
 });
