@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 
 cmd({
-    pattern: "play",
+    pattern: "play2",
     alias: ["song", "music"],
     desc: "Download and play audio from YouTube",
     category: "download",
