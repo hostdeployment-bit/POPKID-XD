@@ -1,67 +1,103 @@
-const { cmd } = require('../command');
-const config = require('../config');
+const { cmd } = require('../command')
+const config = require('../config')
+const fs = require("fs")
+const ffmpeg = require("fluent-ffmpeg")
 
 cmd({
-    pattern: "s",
-    alias: ["sticker", "wm"],
-    desc: "Pro-Level Media Detection Sticker Maker",
-    category: "convert",
-    filename: __filename
-}, async (conn, m, mek, { from, reply, sender }) => {
-    try {
-        // 1. PRO-LEVEL DETECTION
-        // This checks deep inside the message structure to find any image or video
-        const isQuoted = m.quoted ? m.quoted : m;
-        const mime = (isQuoted.msg || isQuoted).mimetype || '';
-        const isMedia = /image|video|sticker/.test(mime);
+pattern: "s",
+alias: ["sticker","wm"],
+desc: "Create HD Sticker",
+category: "convert",
+filename: __filename
+},
 
-        if (!isMedia) {
-            return reply("*Reply to a photo or a short video!* 📸");
-        }
+async(conn, m, mek, {from, reply}) => {
 
-        await conn.sendMessage(from, { react: { text: "🪄", key: mek.key } });
+try{
 
-        // 2. STABLE DOWNLOAD
-        // Uses the built-in downloader which is safest for Heroku's memory
-        const buffer = await isQuoted.download();
+const quoted = m.quoted ? m.quoted : m
+const mime = (quoted.msg || quoted).mimetype || ""
 
-        // 3. POPKID SLIM BRANDING
-        const fakevCard = {
-            key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
-            message: {
-                contactMessage: {
-                    displayName: "Popkid Ke",
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
-                }
-            }
-        };
+if(!mime) return reply("*Reply to an image, video, or gif!* 📸")
 
-        const minimalistContext = {
-            mentionedJid: [sender],
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
-                newsletterName: 'POPKID XMD STICKER',
-                serverMessageId: 1
-            }
-        };
+await conn.sendMessage(from,{react:{text:"🪄",key:mek.key}})
 
-        // 4. THE PRO SEND
-        // Sending directly with packname/author prevents 'sticker-formatter' module errors
-        await conn.sendMessage(from, { 
-            sticker: buffer, 
-            contextInfo: minimalistContext 
-        }, { 
-            quoted: fakevCard,
-            packname: "POPKID XMD", 
-            author: "Popkid Ke" 
-        });
+const media = await quoted.download()
 
-        await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
+/*
+IMAGE STICKER
+*/
 
-    } catch (err) {
-        console.error("PRO STICKER ERROR:", err);
-        reply("❌ *Processing failed. Ensure the video is under 7 seconds!*");
-    }
-});
+if(mime.includes("image")){
+
+await conn.sendMessage(from,{
+sticker: media,
+packname: "POPKID XMD",
+author: "Popkid Ke"
+},{quoted:m})
+
+}
+
+/*
+VIDEO OR GIF STICKER
+*/
+
+else if(mime.includes("video") || mime.includes("gif")){
+
+let input = `./temp_${Date.now()}.mp4`
+let output = `./sticker_${Date.now()}.webp`
+
+fs.writeFileSync(input, media)
+
+await new Promise((resolve,reject)=>{
+
+ffmpeg(input)
+
+.inputOptions(["-t 7"])
+
+.outputOptions([
+"-vcodec libwebp",
+"-vf scale=512:512:force_original_aspect_ratio=decrease,fps=15",
+"-loop 0",
+"-preset default",
+"-an",
+"-vsync 0"
+])
+
+.save(output)
+
+.on("end",resolve)
+.on("error",reject)
+
+})
+
+const sticker = fs.readFileSync(output)
+
+await conn.sendMessage(from,{
+sticker: sticker,
+packname: "POPKID XMD",
+author: "Popkid Ke"
+},{quoted:m})
+
+fs.unlinkSync(input)
+fs.unlinkSync(output)
+
+}
+
+else{
+
+reply("*Reply to image or video only!*")
+
+}
+
+await conn.sendMessage(from,{react:{text:"✅",key:mek.key}})
+
+}catch(err){
+
+console.log(err)
+
+reply("❌ Sticker creation failed")
+
+}
+
+})
