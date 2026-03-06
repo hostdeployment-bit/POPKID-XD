@@ -9,27 +9,25 @@ const os = require('os');
 cmd({
     pattern: "play2",
     alias: ["song2", "music2"],
-    desc: "Download and play audio from YouTube in Popkid style",
+    desc: "Download and play audio from YouTube",
     category: "download",
     filename: __filename
-}, async (conn, m, mek, { from, q, reply, sender }) => { // Parameter order matched to your ping
+}, async (conn, mek, m, { from, q, reply, sender }) => { 
     try {
-        if (!q) return reply("*Please provide a song name!* 🎧");
+        // 1. Validation
+        if (!q) return reply("*Please provide a song name or link!* 🎧");
 
+        // 2. Search Logic
         const search = await yts(q);
         const data = search.videos[0];
         if (!data) return reply("*No results found.* ❌");
 
-        // React to the message
-        await conn.sendMessage(from, { react: { text: "🎶", key: mek.key } });
+        // 3. React to indicate processing
+        await conn.sendMessage(from, { react: { text: "📥", key: mek.key } });
 
-        // Define the fakevCard (Popkid Ke)
+        // 4. Fake vCard for styling (Popkid style)
         const fakevCard = {
-            key: {
-                fromMe: false,
-                participant: "0@s.whatsapp.net",
-                remoteJid: "status@broadcast"
-            },
+            key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
             message: {
                 contactMessage: {
                     displayName: "Popkid Ke",
@@ -38,48 +36,61 @@ cmd({
             }
         };
 
-        // Context info for newsletter style
-        const newsletterContextInfo = {
+        // 5. Send Info with Newsletter Context
+        const newsletterContext = {
             mentionedJid: [sender],
             forwardingScore: 999,
             isForwarded: true,
             forwardedNewsletterMessageInfo: {
                 newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
-                newsletterName: config.OWNER_NAME || 'POPKID',
+                newsletterName: 'POPKID XMD PLAYER',
                 serverMessageId: 1
             },
             externalAdReply: {
-                title: `POPKID PLAYER: ${data.title}`,
-                body: "⚡ 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐈𝐍𝐆 𝐀𝐔𝐃𝐈𝐎",
+                title: data.title,
+                body: "⚡ 𝐒𝐄𝐀𝐑𝐂𝐇𝐈𝐍𝐆 𝐒𝐔𝐂𝐂𝐄𝐒𝐒𝐅𝐔𝐋",
                 mediaType: 1,
-                thumbnailUrl: data.thumbnail, 
+                thumbnailUrl: data.thumbnail,
                 renderLargerThumbnail: true,
                 sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
             }
         };
 
-        // Send info message
-        let desc = `*Title:* ${data.title}\n*Duration:* ${data.timestamp}\n*Link:* ${data.url}\n\n> © Popkid Ke`;
-        await conn.sendMessage(from, { text: desc, contextInfo: newsletterContextInfo }, { quoted: fakevCard });
+        await conn.sendMessage(from, { 
+            text: `*Title:* ${data.title}\n*Duration:* ${data.timestamp}\n\n> © Popkid Ke`, 
+            contextInfo: newsletterContext 
+        }, { quoted: fakevCard });
 
-        // Download Audio
+        // 6. Download Process
         const audioPath = path.join(os.tmpdir(), `${data.videoId}.mp3`);
-        const stream = ytdl(data.url, { filter: 'audioonly', quality: 'highestaudio' });
+        const stream = ytdl(data.url, { 
+            filter: 'audioonly', 
+            quality: 'highestaudio' 
+        });
+
         const fileStream = fs.createWriteStream(audioPath);
         stream.pipe(fileStream);
 
         fileStream.on('finish', async () => {
+            // 7. Send the Audio
             await conn.sendMessage(from, { 
                 audio: { url: audioPath }, 
                 mimetype: 'audio/mpeg', 
                 fileName: `${data.title}.mp3` 
             }, { quoted: mek });
 
+            // 8. Cleanup
             if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+            await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
+        });
+
+        fileStream.on('error', (err) => {
+            console.error(err);
+            reply("❌ *Error saving file.*");
         });
 
     } catch (err) {
         console.error("PLAY2 ERROR:", err);
-        reply("❌ *Failed to process audio download.*");
+        reply("❌ *Download failed. Try again.*");
     }
 });
