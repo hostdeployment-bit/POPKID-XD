@@ -4,24 +4,28 @@ const config = require('../config');
 cmd({
     pattern: "s",
     alias: ["sticker", "wm"],
-    desc: "Fast API-based Sticker Maker",
+    desc: "Pro-Level Media Detection Sticker Maker",
     category: "convert",
     filename: __filename
-}, async (conn, m, mek, { from, reply, sender, isQuotedImage, isQuotedVideo }) => {
+}, async (conn, m, mek, { from, reply, sender }) => {
     try {
-        // 1. Detection
-        const isMedia = (m.type === 'imageMessage' || m.type === 'videoMessage');
-        const isQuoted = (isQuotedImage || isQuotedVideo);
-        
-        if (!isMedia && !isQuoted) return reply("*Reply to an image or short video!* 📸");
+        // 1. PRO-LEVEL DETECTION
+        // This checks deep inside the message structure to find any image or video
+        const isQuoted = m.quoted ? m.quoted : m;
+        const mime = (isQuoted.msg || isQuoted).mimetype || '';
+        const isMedia = /image|video|sticker/.test(mime);
+
+        if (!isMedia) {
+            return reply("*Reply to a photo or a short video!* 📸");
+        }
 
         await conn.sendMessage(from, { react: { text: "🪄", key: mek.key } });
 
-        // 2. Download Media to Buffer
-        const download = m.quoted ? m.quoted : m;
-        const buffer = await download.download();
+        // 2. STABLE DOWNLOAD
+        // Uses the built-in downloader which is safest for Heroku's memory
+        const buffer = await isQuoted.download();
 
-        // 3. Popkid Style Context (Slim)
+        // 3. POPKID SLIM BRANDING
         const fakevCard = {
             key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
             message: {
@@ -43,8 +47,8 @@ cmd({
             }
         };
 
-        // 4. Send the Sticker with Metadata
-        // Using conn.sendMessage directly with your branding
+        // 4. THE PRO SEND
+        // Sending directly with packname/author prevents 'sticker-formatter' module errors
         await conn.sendMessage(from, { 
             sticker: buffer, 
             contextInfo: minimalistContext 
@@ -57,7 +61,7 @@ cmd({
         await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
     } catch (err) {
-        console.error("STICKER ERROR:", err);
-        reply("❌ *Failed. Ensure the video is under 7 seconds.*");
+        console.error("PRO STICKER ERROR:", err);
+        reply("❌ *Processing failed. Ensure the video is under 7 seconds!*");
     }
 });
