@@ -32,7 +32,7 @@ cmd({
         // Send the image directly using the result.image_url
         await conn.sendMessage(from, {
             image: { url: data.result.image_url },
-            caption: `*💻 KHAN-MD HACKER AVATAR 💻*\n\n*👤 Name:* ${name}\n*🛠️ Style:* 1\n\n*Created by Popkid*`
+            caption: `*💻 POPKID-MD HACKER AVATAR 💻*\n\n*👤 Name:* ${name}\n*🛠️ Style:* 1\n\n*Created by Popkid*`
         }, { quoted: m });
 
     } catch (e) {
