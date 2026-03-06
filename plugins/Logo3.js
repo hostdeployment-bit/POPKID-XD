@@ -2,20 +2,20 @@ const { cmd, commands } = require('../command');
 const { fetchJson, getBuffer } = require('../lib/functions2');
 
 //---------------------------------------------
-//           POPKID AI: DUAL-TEXT LOGOS (FIXED)
+//           POPKID AI: SHORT DUAL-TEXT
 //---------------------------------------------
 
 const dualTextEffects = [
-    { pattern: "space3d", react: "🚀" },
-    { pattern: "pornhubLogo", react: "🟠" },
-    { pattern: "pencilSketch", react: "✏️" },
-    { pattern: "thorLogo", react: "🔨" },
-    { pattern: "deadpool", react: "💀" },
-    { pattern: "footballShirt", react: "👕" },
-    { pattern: "wolfGalaxy", react: "🐺" },
-    { pattern: "marvelLogo", react: "🦸" },
-    { pattern: "avengersLogo", react: "🅰️" },
-    { pattern: "tiktok", react: "📱" }
+    { pattern: "space", api: "space3d", react: "🚀" },
+    { pattern: "phub", api: "pornhubLogo", react: "🟠" },
+    { pattern: "sketch", api: "pencilSketch", react: "✏️" },
+    { pattern: "thor", api: "thorLogo", react: "🔨" },
+    { pattern: "deadpool", api: "deadpool", react: "💀" },
+    { pattern: "shirt", api: "footballShirt", react: "👕" },
+    { pattern: "wolf", api: "wolfGalaxy", react: "🐺" },
+    { pattern: "marvel", api: "marvelLogo", react: "🦸" },
+    { pattern: "avengers", api: "avengersLogo", react: "🅰️" },
+    { pattern: "tiktok", api: "tiktok", react: "📱" }
 ];
 
 dualTextEffects.forEach((effect) => {
@@ -32,6 +32,7 @@ dualTextEffects.forEach((effect) => {
 
             let text1, text2;
 
+            // Better splitting logic
             if (input.includes(",")) {
                 let split = input.split(",");
                 text1 = split[0].trim();
@@ -42,18 +43,13 @@ dualTextEffects.forEach((effect) => {
                 text2 = split.slice(1).join(" ").trim() || "AI";
             }
 
-            // Ensure we don't send empty strings to the API
-            if (!text1 || !text2) return reply("❌ Please provide two valid names.");
+            // Correct API Mapping
+            const apiUrl = `https://api.giftedtech.co.ke/api/ephoto360/${effect.api}?apikey=gifted&text1=${encodeURIComponent(text1)}&text2=${encodeURIComponent(text2)}`;
 
-            const apiUrl = `https://api.giftedtech.co.ke/api/ephoto360/${effect.pattern}?apikey=gifted&text1=${encodeURIComponent(text1)}&text2=${encodeURIComponent(text2)}`;
-
-            // Adding a small delay/timeout handling via fetchJson
             const data = await fetchJson(apiUrl);
 
             if (!data || data.success !== true || !data.result?.image_url) {
-                // Log error to console to see what the API actually says
-                console.log(`API Error [${effect.pattern}]:`, data);
-                return reply("❌ Generation failed. The API might be rate-limited. Try again in a few seconds.");
+                return reply("❌ Generation failed. Try again with shorter names.");
             }
 
             await conn.sendMessage(from, {
@@ -62,7 +58,6 @@ dualTextEffects.forEach((effect) => {
             }, { quoted: m });
 
         } catch (e) {
-            console.error(e);
             return reply(`*Error:* ${e.message}`);
         }
     });
