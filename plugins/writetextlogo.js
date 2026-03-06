@@ -5,7 +5,7 @@ const { fetchJson, getBuffer } = require('../lib/functions2');
 //           POPKID AI: WRITE TEXT
 //---------------------------------------------
 cmd({
-    pattern: "writetext",
+    pattern: "write",
     desc: "Create a custom write-text effect",
     category: "logo",
     react: "✍️",
