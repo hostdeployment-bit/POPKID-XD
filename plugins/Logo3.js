@@ -2,12 +2,12 @@ const { cmd, commands } = require('../command');
 const { fetchJson, getBuffer } = require('../lib/functions2');
 
 //---------------------------------------------
-//           POPKID AI: DUAL-TEXT LOGOS
+//           POPKID AI: DUAL-TEXT LOGOS (FIXED)
 //---------------------------------------------
 
 const dualTextEffects = [
     { pattern: "space3d", react: "🚀" },
-    { pattern: "pornhub", react: "🟠" },
+    { pattern: "pornhubLogo", react: "🟠" },
     { pattern: "pencilSketch", react: "✏️" },
     { pattern: "thorLogo", react: "🔨" },
     { pattern: "deadpool", react: "💀" },
@@ -21,44 +21,48 @@ const dualTextEffects = [
 dualTextEffects.forEach((effect) => {
     cmd({
         pattern: effect.pattern,
-        desc: `Create a ${effect.pattern} logo with two texts`,
+        desc: `Create a ${effect.pattern} logo`,
         category: "logo",
         react: effect.react,
         filename: __filename
     }, async (conn, mek, m, { from, args, reply }) => {
         try {
-            const input = args.join(" ");
-            if (!input) return reply(`❌ Please provide text. Example: .${effect.pattern} Popkid, AI`);
+            const input = args.join(" ").trim();
+            if (!input) return reply(`❌ Use: .${effect.pattern} Text1, Text2`);
 
             let text1, text2;
 
-            // Smart Splitter: Check for comma, otherwise split by first space
             if (input.includes(",")) {
-                [text1, text2] = input.split(",").map(i => i.trim());
+                let split = input.split(",");
+                text1 = split[0].trim();
+                text2 = split[1].trim();
             } else {
-                const words = input.split(" ");
-                text1 = words[0];
-                text2 = words.slice(1).join(" ") || "AI"; // Default second text if missing
+                let split = input.split(" ");
+                text1 = split[0].trim();
+                text2 = split.slice(1).join(" ").trim() || "AI";
             }
 
-            // API URL for Dual Text
+            // Ensure we don't send empty strings to the API
+            if (!text1 || !text2) return reply("❌ Please provide two valid names.");
+
             const apiUrl = `https://api.giftedtech.co.ke/api/ephoto360/${effect.pattern}?apikey=gifted&text1=${encodeURIComponent(text1)}&text2=${encodeURIComponent(text2)}`;
 
-            // Fetch JSON Response
+            // Adding a small delay/timeout handling via fetchJson
             const data = await fetchJson(apiUrl);
 
-            // Validation using your specific JSON result structure
-            if (!data || !data.success || !data.result?.image_url) {
-                return reply("❌ Generation failed. The API might be down.");
+            if (!data || data.success !== true || !data.result?.image_url) {
+                // Log error to console to see what the API actually says
+                console.log(`API Error [${effect.pattern}]:`, data);
+                return reply("❌ Generation failed. The API might be rate-limited. Try again in a few seconds.");
             }
 
-            // Send image using the image_url from the JSON response
             await conn.sendMessage(from, {
                 image: { url: data.result.image_url },
-                caption: `*${effect.react} POPKID AI: ${effect.pattern.toUpperCase()} ${effect.react}*\n\n*👤 Text 1:* ${text1}\n*👤 Text 2:* ${text2}\n\n*Created by Popkid from Kenya*`
+                caption: `*${effect.react} POPKID AI: ${effect.pattern.toUpperCase()} ${effect.react}*\n\n*👤 Text 1:* ${text1}\n*👤 Text 2:* ${text2}\n\n*Created by Popkid Kenya*`
             }, { quoted: m });
 
         } catch (e) {
+            console.error(e);
             return reply(`*Error:* ${e.message}`);
         }
     });
