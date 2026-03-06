@@ -15,7 +15,7 @@ async function generateLogo(conn, from, name, themeUrl, reply) {
 
         await conn.sendMessage(from, {
             image: buffer,
-            caption: `*✨ KHAN-MD LOGO GENERATOR ✨*\n*👤 Name:* ${name}\n*🎨 Style:* ${themeUrl.split('-').slice(-2, -1)}`
+            caption: `*✨ POPKID-MD LOGO GENERATOR ✨*\n*👤 Name:* ${name}\n*🎨 Style:* ${themeUrl.split('-').slice(-2, -1)}`
         });
     } catch (e) {
         reply(`*API Error:* ${e.message}`);
