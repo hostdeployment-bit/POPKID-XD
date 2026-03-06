@@ -1,4 +1,5 @@
-const { cmd } = require('../command'); // Fixed 'Const' to 'const'
+const { cmd } = require('../command');
+const config = require('../config');
 const yts = require('yt-search');
 const ytdl = require('@distube/ytdl-core');
 const fs = require('fs');
@@ -8,66 +9,77 @@ const os = require('os');
 cmd({
     pattern: "play2",
     alias: ["song2", "music2"],
-    desc: "Download and play audio from YouTube",
+    desc: "Download and play audio from YouTube in Popkid style",
     category: "download",
-    react: "🎶",
     filename: __filename
-},
-async (conn, mek, m, { from, q, reply }) => {
+}, async (conn, m, mek, { from, q, reply, sender }) => { // Parameter order matched to your ping
     try {
-        if (!q) return reply("*Please provide a song name or YouTube link!* 🎧");
+        if (!q) return reply("*Please provide a song name!* 🎧");
 
-        // 1. Search for the video
         const search = await yts(q);
         const data = search.videos[0];
         if (!data) return reply("*No results found.* ❌");
 
-        let desc = `
-╔══════════════════╗
-  👑 *POPKID-MD PLAYER*
-╚══════════════════╝
-📝 *Title:* ${data.title}
-🕒 *Duration:* ${data.timestamp}
-🔗 *Link:* ${data.url}
+        // React to the message
+        await conn.sendMessage(from, { react: { text: "🎶", key: mek.key } });
 
-*Downloading your audio...* 🚀
-> © Popkid Ke`;
+        // Define the fakevCard (Popkid Ke)
+        const fakevCard = {
+            key: {
+                fromMe: false,
+                participant: "0@s.whatsapp.net",
+                remoteJid: "status@broadcast"
+            },
+            message: {
+                contactMessage: {
+                    displayName: "Popkid Ke",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
+                }
+            }
+        };
 
-        await conn.sendMessage(from, { image: { url: data.thumbnail }, caption: desc }, { quoted: mek });
+        // Context info for newsletter style
+        const newsletterContextInfo = {
+            mentionedJid: [sender],
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
+                newsletterName: config.OWNER_NAME || 'POPKID',
+                serverMessageId: 1
+            },
+            externalAdReply: {
+                title: `POPKID PLAYER: ${data.title}`,
+                body: "⚡ 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐈𝐍𝐆 𝐀𝐔𝐃𝐈𝐎",
+                mediaType: 1,
+                thumbnailUrl: data.thumbnail, 
+                renderLargerThumbnail: true,
+                sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
+            }
+        };
 
-        // 2. Define temp file path
+        // Send info message
+        let desc = `*Title:* ${data.title}\n*Duration:* ${data.timestamp}\n*Link:* ${data.url}\n\n> © Popkid Ke`;
+        await conn.sendMessage(from, { text: desc, contextInfo: newsletterContextInfo }, { quoted: fakevCard });
+
+        // Download Audio
         const audioPath = path.join(os.tmpdir(), `${data.videoId}.mp3`);
-
-        // 3. Download using @distube/ytdl-core
-        const stream = ytdl(data.url, { 
-            filter: 'audioonly', 
-            quality: 'highestaudio' 
-        });
-
+        const stream = ytdl(data.url, { filter: 'audioonly', quality: 'highestaudio' });
         const fileStream = fs.createWriteStream(audioPath);
         stream.pipe(fileStream);
 
         fileStream.on('finish', async () => {
-            // 4. Send the Audio File
             await conn.sendMessage(from, { 
                 audio: { url: audioPath }, 
                 mimetype: 'audio/mpeg', 
                 fileName: `${data.title}.mp3` 
             }, { quoted: mek });
 
-            // 5. Cleanup
-            if (fs.existsSync(audioPath)) {
-                fs.unlinkSync(audioPath);
-            }
+            if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
         });
 
-        fileStream.on('error', (err) => {
-            console.error("FileStream Error:", err);
-            reply("*Failed to save audio file.* ✗");
-        });
-
-    } catch (e) {
-        console.error("Plugin Error:", e);
-        reply("*An error occurred! check terminal.* ❌");
+    } catch (err) {
+        console.error("PLAY2 ERROR:", err);
+        reply("❌ *Failed to process audio download.*");
     }
 });
