@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Final Ultra-Performance Version)
+ * 👑 POPKID-MD (Fast & Status-Fixed Edition)
  * Creator: Popkid Ke
- * Features: Auto-View/React (Including Self), Fast Commands, Aesthetic Logs
+ * Improvements: High-speed Caching, Ultra-Responsive Commands, Global Status Fix
  */
 
 const {
@@ -31,7 +31,7 @@ const axios = require('axios')
 const gradient = require('gradient-string')
 const express = require("express")
 
-// ============ LOGGER & BANNER ============
+// ============ LOGGER CONFIG ============
 const logThemes = {
     info: ['#4facfe', '#00f2fe'],
     success: ['#00b09b', '#96c93d'],
@@ -59,9 +59,9 @@ const botBanner = `
 console.clear();
 cmdLogger.banner(botBanner);
 
-// ============ GLOBAL ANTI-CRASH ============
-process.on("uncaughtException", (err) => cmdLogger.error(`Global Error: ${err.message}`));
-process.on("unhandledRejection", (reason) => cmdLogger.error(`Rejected Promise: ${reason}`));
+// ============ ANTI-CRASH ============
+process.on("uncaughtException", (err) => cmdLogger.error(`System Error: ${err.message}`));
+process.on("unhandledRejection", (reason) => cmdLogger.error(`Rejection: ${reason}`));
 
 const { getBuffer, getGroupAdmins, sleep } = require('./lib/functions')
 const { saveMessage } = require('./data')
@@ -80,7 +80,7 @@ async function loadGiftedSession() {
             const gunzip = promisify(zlib.gunzip);
             const decompressedBuffer = await gunzip(compressedBuffer);
             await fs.promises.writeFile(credsPath, decompressedBuffer.toString('utf-8'));
-            cmdLogger.success("Session Data Decrypted! ✅");
+            cmdLogger.success("Session Data Restored! ✅");
             return true;
         } catch (error) { return false; }
     }
@@ -102,11 +102,11 @@ async function connectToWA() {
             browser: Browsers.macOS("Desktop"),
             auth: {
                 creds: state.creds,
-                // Signal key caching prevents lags by keeping encryption hot in RAM
+                // Signal key caching prevents lags by keeping encryption keys in RAM
                 keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })) 
             },
             version,
-            // Disabled full sync to prevent the bot from hanging during startup
+            // Disabled full sync to prevent the bot from hanging during connection
             syncFullHistory: false, 
             markOnlineOnConnect: true
         })
@@ -123,17 +123,16 @@ async function connectToWA() {
             } else if (connection === 'open') {
                 cmdLogger.success('POPKID-MD CONNECTED SUCCESSFULLY 🚀');
                 
-                // Startup Alert Message
+                // Startup Alert
                 let up = `╔══════════════════╗\n║ 🚀 POPKID-MD ONLINE\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 STATUS: Full Status Power ✅\n╚══════════════════╝`;
                 await conn.sendMessage(conn.user.id, { image: { url: `https://files.catbox.moe/j9ia5c.png` }, caption: up });
                 
-                // Automated Channel Follow
+                // Auto-Follow
                 try { await conn.newsletterFollow("120363423997837331@newsletter") } catch (e) {}
                 
-                // Dynamic Plugin Loading
+                // Load Plugins
                 const plugins = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
                 plugins.forEach(plugin => require("./plugins/" + plugin));
-                cmdLogger.success(`Successfully loaded ${plugins.length} plugins.`);
             }
         })
 
@@ -145,19 +144,18 @@ async function connectToWA() {
             
             const from = msg.key.remoteJid
             const isStatus = from === 'status@broadcast'
-            const sender = msg.key.participant || msg.key.remoteJid;
-
-            // ============ ⚡ THE STATUS MASTER FIX (INCLUDES SELF) ============
+            
+            // ============ ⚡ GLOBAL STATUS FIX (SELF + OTHERS) ============
             if (isStatus) {
                 const participant = msg.key.participant || msg.key.remoteJid;
                 const myJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
 
-                // Auto-View Status (Self & Others)
+                // Auto-View Status (Everyone)
                 if (config.AUTO_STATUS_SEEN === "true") {
-                    await conn.readMessages([msg.key]);
+                    await conn.readMessages([msg.key]).catch(() => {});
                 }
 
-                // Auto-React Status (Self & Others)
+                // Auto-React Status (Everyone)
                 if (config.AUTO_STATUS_REACT === "true") {
                     const emojis = (config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,👑').split(',').map(e => e.trim());
                     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
@@ -172,7 +170,7 @@ async function connectToWA() {
                 return; 
             }
 
-            // ============ 📩 LOGGING (SLIM BOX STYLE) ============
+            // ============ 📩 LOGGER (SLIM BOX STYLE) ============
             if (!msg.key.fromMe) {
                 const typeLog = getContentType(msg.message);
                 const pushLog = (msg.pushName || 'User').substring(0, 12);
@@ -192,10 +190,11 @@ async function connectToWA() {
             const args = body.trim().split(/ +/).slice(1)
             const text = args.join(' ')
             const isGroup = from.endsWith('@g.us')
+            const sender = msg.key.participant || msg.key.remoteJid;
             const senderNumber = sender.split('@')[0]
             const isOwner = ownerNumber.includes(senderNumber) || msg.key.fromMe
 
-            // Filter for Mode
+            // Mode Lock
             if (!isOwner && config.MODE === "private") return
             if (!isOwner && isGroup && config.MODE === "inbox") return
             if (!isOwner && !isGroup && config.MODE === "groups") return
@@ -214,14 +213,6 @@ async function connectToWA() {
                     } catch (e) { cmdLogger.error(`Plugin Error: ${e}`) }
                 }
             }
-
-            // Body Listeners
-            events.commands.map(async (command) => {
-                if (body && command.on === "body") {
-                    command.function(conn, msg, m, { from, body, isCmd, command, args, q: text, text, isGroup, sender, senderNumber, pushname: msg.pushName || 'User', isOwner, reply: (teks) => conn.sendMessage(from, { text: teks }, { quoted: msg }) })
-                }
-            });
-
         })
 
         // Core Helper Logic
