@@ -1,75 +1,79 @@
-const config = require('../config')
-const {cmd , commands} = require('../command')
-const os = require("os")
-const {runtime} = require('../lib/functions')
-const axios = require('axios')
-const {sleep} = require('../lib/functions')
-const fs = require('fs')
-const path = require('path')
+const axios = require('axios');
+const { cmd } = require('../command');
+const config = require('../config');
 
 cmd({
     pattern: "repo",
-    alias: ["sc", "script", "repository"],
-    desc: "Fetch information about a GitHub repository.",
-    react: "✅",
-    category: "info",
-    filename: __filename,
+    alias: ["git", "sc", "script"],
+    desc: "Fetch the bot repository details",
+    category: "main",
+    react: "👑",
+    filename: __filename
 },
-async (conn, mek, m, { from, reply }) => {
-    const githubRepoURL = 'https://github.com/popkidmd/POPKID-MD';
-
+async (conn, mek, m, { from, reply, sender }) => {
     try {
-        // Extract username and repo name from the URL
-        const [, username, repoName] = githubRepoURL.match(/github\.com\/([^/]+)\/([^/]+)/);
-
-        // Fetch repository details using GitHub API with axios
-        const response = await axios.get(`https://api.github.com/repos/${username}/${repoName}`);
+        const repoUrl = "https://github.com/popkidc/POPKID-XD";
+        const apiUrl = "https://api.github.com/repos/popkidc/POPKID-XD";
         
-        const repoData = response.data;
+        // Fetching real-time data from GitHub
+        const response = await axios.get(apiUrl);
+        const data = response.data;
 
-        // Format the repository information in new stylish format
-        const formattedInfo = `
-*┏────〘 *POPKID* 〙───⊷*
-*┃* *📌 Repository Name:* ${repoData.name}
-*┃* *👑 Owner:* ᴘᴏᴘᴋɪᴅ ᴋᴇ
-*┃* *⭐ Stars:* ${repoData.stargazers_count}
-*┃* *⑂ Forks:* ${repoData.forks_count}
-*┃* *📝 Description:* ${repoData.description || '*World Best WhatsApp Bot powered by popkid*'}
-*┃* *🔗 GitHub Link:* ${repoData.html_url}
-*┗──────────────⊷*
-`.trim();
+        let repoMsg = `👑 *POPKID-MD REPO DETAILS* 👑
 
-        // Send an image with the formatted info as a caption
-        await conn.sendMessage(from, {
-            image: { url: `https://files.catbox.moe/kiy0hl.jpg` }, // Replace with your image URL
-            caption: formattedInfo,
-            contextInfo: { 
-                mentionedJid: [m.sender],
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363289379419860@newsletter',
-                    newsletterName: 'popkid xtr',
-                    serverMessageId: 143
+✨ *Repository Name:* ${data.name}
+👤 *Owner:* ${data.owner.login}
+⭐ *Stars:* ${data.stargazers_count}
+🍴 *Forks:* ${data.forks_count}
+📅 *Last Updated:* ${new Date(data.updated_at).toLocaleDateString()}
+
+🔗 *Repo Link:* ${repoUrl}
+
+> *Created by Popkid Kenya* 👨‍💻`;
+
+        // Define the fakevCard (Popkid Ke)
+        const fakevCard = {
+            key: {
+                fromMe: false,
+                participant: "0@s.whatsapp.net",
+                remoteJid: "status@broadcast"
+            },
+            message: {
+                contactMessage: {
+                    displayName: "Popkid Ke",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
                 }
             }
-        }, { quoted: mek });
+        };
 
-        // Send audio voice message after sending repo info
-        const audioPath = path.join(__dirname, '../assets/menux.m4a');
-        
-        if (fs.existsSync(audioPath)) {
-            await conn.sendMessage(from, {
-                audio: { url: audioPath },
-                mimetype: 'audio/mp4',
-                ptt: true
-            }, { quoted: mek });
-        } else {
-            console.error("Audio file not found at path:", audioPath);
-        }
+        // Context info for newsletter and link preview
+        const newsletterContextInfo = {
+            mentionedJid: [sender],
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
+                newsletterName: config.OWNER_NAME || 'POPKID',
+                serverMessageId: 1
+            },
+            externalAdReply: {
+                title: "POPKID XMD REPO",
+                body: "𝐒𝐂𝐑𝐈𝐏𝐓 𝐃𝐄𝐓𝐀𝐈𝐋𝐒 ⚡",
+                mediaType: 1,
+                thumbnailUrl: "https://files.catbox.moe/j9ia5c.png",
+                renderLargerThumbnail: true,
+                sourceUrl: repoUrl
+            }
+        };
 
-    } catch (error) {
-        console.error("Error in repo command:", error);
-        reply("❌ Sorry, something went wrong while fetching the repository information. Please try again later.");
+        await conn.sendMessage(from, {
+            image: { url: `https://files.catbox.moe/j9ia5c.png` },
+            caption: repoMsg,
+            contextInfo: newsletterContextInfo
+        }, { quoted: fakevCard });
+
+    } catch (e) {
+        console.log(e);
+        reply("❌ Error fetching repository details. Please try again later.");
     }
 });
