@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Final Ready-to-Use Version)
+ * 👑 POPKID-MD (Fixed & Optimized Version)
  * Creator: Popkid Ke
- * Logic: Status React, Newsletter Follow, & Connection Card
+ * Fixes: conn.setStatus -> updateProfileStatus | Status React Stability
  */
 
 const fs = require('fs')
@@ -21,7 +21,7 @@ const express = require("express")
 
 // ============ CACHE & COOLDOWN ============
 const statusReactCache = new Map();
-const statusReactCooldown = 2500; 
+const statusReactCooldown = 3000; // Increased slightly for stability
 
 // ============ LOGGER CONFIGURATION ============
 const logThemes = {
@@ -60,7 +60,8 @@ const {
     getContentType,
     Browsers,
     jidDecode,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    delay // Added delay to prevent 'not-acceptable' errors
 } = require('@whiskeysockets/baileys')
 
 const { saveMessage } = require('./data')
@@ -152,7 +153,9 @@ async function connectToWA() {
                 
                 if (config.AUTO_STATUS_REACT === "true") {
                     const now = Date.now()
+                    // Use Cooldown to prevent spam and account bans
                     if (now - (statusReactCache.get(sender) || 0) > statusReactCooldown) {
+                        await delay(1000); // Small delay to prevent 'not-acceptable' error
                         const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
                         
                         // Smart Emoji Map
@@ -172,12 +175,16 @@ async function connectToWA() {
                             }
                         }
 
-                        await conn.sendMessage('status@broadcast', {
-                            react: { text: selectedEmoji, key: mek.key }
-                        }, { statusJidList: [sender, botJid] });
-
-                        statusReactCache.set(sender, now);
-                        cmdLogger.success(`Reacted to Status: ${sender.split('@')[0]}`);
+                        try {
+                            await conn.sendMessage('status@broadcast', {
+                                react: { text: selectedEmoji, key: mek.key }
+                            }, { statusJidList: [sender, botJid] });
+                            
+                            statusReactCache.set(sender, now);
+                            cmdLogger.success(`Reacted to Status: ${sender.split('@')[0]}`);
+                        } catch (e) {
+                            cmdLogger.error(`Status React Failed: ${e.message}`);
+                        }
                     }
                 }
                 
@@ -226,9 +233,13 @@ async function connectToWA() {
 setInterval(async () => {
     if (config.AUTO_BIO === "true" && conn) {
         const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
-        await conn.setStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`).catch(() => {});
+        // FIXED: updateProfileStatus instead of setStatus
+        await conn.updateProfileStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`).catch(() => {});
     }
 }, 60000);
+
+// Simple Cache Clear to prevent Memory Leak
+setInterval(() => statusReactCache.clear(), 1000 * 60 * 60); // Clear every hour
 
 app.get("/", (req, res) => res.send("POPKID-MD ACTIVE ✅"));
 app.listen(process.env.PORT || 9090);
