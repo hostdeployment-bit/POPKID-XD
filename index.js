@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Fixed & Ultra-Fast)
- * Optimized by Gemini for Popkid Ke
- * Fixed: Command Responsiveness, Status Lags, and Connection Stability
+ * 👑 POPKID-MD (Final Stable Version)
+ * Creator: Popkid Ke
+ * Status: Fixed (Auto-View, Auto-React, High-Speed Commands)
  */
 
 const {
@@ -31,7 +31,7 @@ const axios = require('axios')
 const gradient = require('gradient-string')
 const express = require("express")
 
-// ============ LOGGER & BANNER (Original Style) ============
+// ============ LOGGER & BANNER ============
 const logThemes = {
     info: ['#4facfe', '#00f2fe'],
     success: ['#00b09b', '#96c93d'],
@@ -58,11 +58,11 @@ const botBanner = `
 
 console.clear();
 cmdLogger.banner(botBanner);
-cmdLogger.info("Starting POPKID-MD (Fast Mode)... 🚀");
+cmdLogger.info("Initializing POPKID-MD Pro Engine... 🚀");
 
 // ============ GLOBAL ANTI-CRASH ============
-process.on("uncaughtException", (err) => cmdLogger.error(`Uncaught: ${err.message}`));
-process.on("unhandledRejection", (reason) => cmdLogger.error(`Rejected: ${reason}`));
+process.on("uncaughtException", (err) => cmdLogger.error(`System Error: ${err.message}`));
+process.on("unhandledRejection", (reason) => cmdLogger.error(`Rejection: ${reason}`));
 
 const { getBuffer, getGroupAdmins, sleep } = require('./lib/functions')
 const { saveMessage } = require('./data')
@@ -81,7 +81,7 @@ async function loadGiftedSession() {
             const gunzip = promisify(zlib.gunzip);
             const decompressedBuffer = await gunzip(compressedBuffer);
             await fs.promises.writeFile(credsPath, decompressedBuffer.toString('utf-8'));
-            cmdLogger.success("Session Restored ✅");
+            cmdLogger.success("Session Data Restored! ✅");
             return true;
         } catch (error) { return false; }
     }
@@ -103,10 +103,10 @@ async function connectToWA() {
             browser: Browsers.macOS("Desktop"),
             auth: {
                 creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })) // FIX: Speeds up encryption
+                keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })) 
             },
             version,
-            syncFullHistory: false // FIX: Prevents bot from hanging on startup
+            syncFullHistory: false
         })
 
         conn.ev.on('connection.update', async (update) => {
@@ -116,13 +116,13 @@ async function connectToWA() {
                 const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
                 if (shouldReconnect) setTimeout(() => connectToWA(), 3000)
             } else if (connection === 'open') {
-                cmdLogger.success('POPKID XD IS ONLINE 📲');
+                cmdLogger.success('POPKID-MD CONNECTED SUCCESSFULLY 📲');
                 
-                // Startup Message
-                let up = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
+                // Startup Alert
+                let up = `╔══════════════════╗\n║ 🚀 POPKID-MD ONLINE\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 STATUS: Active ✅\n╚══════════════════╝`;
                 await conn.sendMessage(conn.user.id, { image: { url: `https://files.catbox.moe/j9ia5c.png` }, caption: up });
                 
-                // Auto-Follow
+                // Channel Auto-Follow
                 try { await conn.newsletterFollow("120363423997837331@newsletter") } catch (e) {}
                 
                 // Load Plugins
@@ -136,22 +136,31 @@ async function connectToWA() {
         conn.ev.on('messages.upsert', async (mek) => {
             const msg = mek.messages[0]
             if (!msg.message) return
+            
             const from = msg.key.remoteJid
             const isStatus = from === 'status@broadcast'
             const sender = msg.key.participant || msg.key.remoteJid;
 
-            // ============ ⚡ STATUS HANDLER (NON-BLOCKING) ============
+            // ============ ⚡ STATUS HANDLER (FIXED) ============
             if (isStatus) {
-                if (config.AUTO_STATUS_SEEN === "true") await conn.readMessages([msg.key]);
-                if (config.AUTO_STATUS_REACT === "true") {
-                    const emojis = (config.STATUS_REACTIONS || '❤️,🔥,⚡').split(',').map(e => e.trim());
+                if (config.AUTO_STATUS_SEEN === "true") {
+                    await conn.readMessages([msg.key]);
+                }
+                if (config.AUTO_STATUS_REACT === "true" && !msg.key.fromMe) {
+                    const emojis = (config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,💎,👑').split(',').map(e => e.trim());
                     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                    conn.sendMessage(from, { react: { text: randomEmoji, key: msg.key } }, { statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net'] }).catch(() => {});
+                    
+                    // Crucial: statusJidList is required for status reactions to show up
+                    conn.sendMessage(from, { 
+                        react: { text: randomEmoji, key: msg.key } 
+                    }, { 
+                        statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net'] 
+                    }).catch(() => {});
                 }
                 return;
             }
 
-            // ============ 📩 LOGGER (BOX STYLE) ============
+            // ============ 📩 LOGGER (ORIGINAL STYLE) ============
             if (!msg.key.fromMe) {
                 const typeLog = getContentType(msg.message);
                 const pushLog = (msg.pushName || 'User').substring(0, 12);
@@ -161,7 +170,7 @@ async function connectToWA() {
                 console.log(boxColor(`┌─── ${timeLog} 👤 ${pushLog} 📍 ${locLog} ───┐`));
             }
 
-            // ============ 🚀 COMMAND HANDLER ============
+            // ============ 🚀 COMMAND ENGINE ============
             const m = sms(conn, msg)
             const type = getContentType(msg.message)
             const body = (type === 'conversation') ? msg.message.conversation : (type === 'extendedTextMessage') ? msg.message.extendedTextMessage.text : (type == 'imageMessage') && msg.message.imageMessage.caption ? msg.message.imageMessage.caption : (type == 'videoMessage') && msg.message.videoMessage.caption ? msg.message.videoMessage.caption : ''
@@ -175,25 +184,23 @@ async function connectToWA() {
             const isOwner = ownerNumber.includes(senderNumber) || msg.key.fromMe
             const pushname = msg.pushName || 'User'
 
-            // Mode Filters
+            // Mode Lock
             if (!isOwner && config.MODE === "private") return
             if (!isOwner && isGroup && config.MODE === "inbox") return
             if (!isOwner && !isGroup && config.MODE === "groups") return
 
-            // Command Execution
             const events = require('./command')
             if (isCmd) {
                 const cmd = events.commands.find((c) => c.pattern === command || (c.alias && c.alias.includes(command)))
                 if (cmd) {
                     if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: msg.key } })
                     try {
-                        // FIX: Added 'q' and 'reply' to context
                         await cmd.function(conn, msg, m, { 
                             from, body, isCmd, command, args, q: text, text, isGroup, 
                             sender, senderNumber, pushname, isOwner, 
                             reply: (teks) => conn.sendMessage(from, { text: teks }, { quoted: msg }) 
                         });
-                    } catch (e) { cmdLogger.error(e) }
+                    } catch (e) { cmdLogger.error(`Plugin Error: ${e}`) }
                 }
             }
 
@@ -206,7 +213,7 @@ async function connectToWA() {
 
         })
 
-        // Core Utilities
+        // Core JID Decoder
         conn.decodeJid = jid => {
             if (!jid) return jid;
             if (/:\d+@/gi.test(jid)) {
@@ -214,7 +221,8 @@ async function connectToWA() {
                 return (decode.user && decode.server && decode.user + '@' + decode.server) || jid;
             } else return jid;
         };
-    } catch (err) { cmdLogger.error(err.message) }
+
+    } catch (err) { cmdLogger.error(`Connection Error: ${err.message}`) }
 }
 
 // Keep Alive Server
