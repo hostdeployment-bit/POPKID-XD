@@ -1,7 +1,7 @@
 /**
 👑 POPKID-MD (Ultimate Version)
 Creator: Popkid Ke
-Features: Smart Status React, Autofollow, Anti-Delete, Command Eval, Aesthetic Logs
+Features: Smart Status React, POPKID Session Support, Autofollow, Aesthetic Logs
 */
 
 const {
@@ -39,25 +39,23 @@ const axios = require('axios')
 const gradient = require('gradient-string')
 const express = require("express")
 
-// ============ CACHE & COOLDOWN (Nova Style) ============
+// ============ CACHE & COOLDOWN ============
 const statusReactCache = new Map();
 const statusReactCooldown = 3000; 
 
-// ============ LOGGER & BANNER CONFIGURATION ============
+// ============ LOGGER CONFIGURATION ============
 const logThemes = {
     info: ['#4facfe', '#00f2fe'],
     success: ['#00b09b', '#96c93d'],
     warning: ['#f83600', '#f9d423'],
-    error: ['#ff416c', '#ff4b2b'],
-    banner: ['#ff00cc', '#3333ff']
+    error: ['#ff416c', '#ff4b2b']
 };
 
 const cmdLogger = {
     info: (msg) => console.log(gradient(logThemes.info[0], logThemes.info[1])(`ℹ ${msg}`)),
     success: (msg) => console.log(gradient(logThemes.success[0], logThemes.success[1])(`✓ ${msg}`)),
     warning: (msg) => console.log(gradient(logThemes.warning[0], logThemes.warning[1])(`⚠ ${msg}`)),
-    error: (msg) => console.log(gradient(logThemes.error[0], logThemes.error[1])(`✗ ${msg}`)),
-    banner: (msg) => console.log(gradient(logThemes.banner[0], logThemes.banner[1])(msg))
+    error: (msg) => console.log(gradient(logThemes.error[0], logThemes.error[1])(`✗ ${msg}`))
 };
 
 const botBanner = `██████╗  ██████╗ ██████╗ ██╗  ██╗██╗██████╗ 
@@ -68,7 +66,7 @@ const botBanner = `██████╗  ██████╗ █████�
 ╚═╝      ╚═════╝ ╚═╝     ╚═╝  ╚═╝╚═╝╚═════╝`;
 
 console.clear();
-cmdLogger.banner(botBanner);
+console.log(gradient('#ff00cc', '#3333ff')(botBanner));
 
 // ============ GLOBAL ANTI-CRASH ============
 process.on("uncaughtException", (err) => cmdLogger.error(`Uncaught Exception: ${err.message}`));
@@ -78,23 +76,26 @@ const { getBuffer, getGroupAdmins, saveMessage } = require('./lib/functions')
 const ownerNumber = ['254732297194']
 const sessionDir = path.join(__dirname, 'sessions');
 
-async function loadGiftedSession() {
+// ============ POPKID SESSION DECODER ============
+async function loadPopkidSession() {
     if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
     if (fs.existsSync(path.join(sessionDir, 'creds.json'))) return true;
-    if (config.SESSION_ID && config.SESSION_ID.includes("~")) {
-        const prefix = config.SESSION_ID.split('~')[0] + '~';
-        const compressedBase64 = config.SESSION_ID.replace(prefix, '');
+    
+    if (config.SESSION_ID && config.SESSION_ID.startsWith("POPKID~")) {
+        const compressedBase64 = config.SESSION_ID.replace("POPKID~", "");
         try {
             const compressedBuffer = Buffer.from(compressedBase64, 'base64');
             const gunzip = promisify(zlib.gunzip);
             const decompressedBuffer = await gunzip(compressedBuffer);
             await fs.promises.writeFile(path.join(sessionDir, 'creds.json'), decompressedBuffer.toString('utf-8'));
-            cmdLogger.success("Session restored successfully ✅");
+            cmdLogger.success("POPKID Session restored successfully ✅");
             return true;
         } catch (error) {
-            cmdLogger.error("Failed to decompress session ID");
+            cmdLogger.error("Failed to decompress POPKID session ID");
             return false;
         }
+    } else {
+        cmdLogger.warning("Invalid or missing SESSION_ID (Must start with POPKID~)");
     }
     return false;
 }
@@ -105,7 +106,7 @@ let conn
 
 async function connectToWA() {
     try {
-        await loadGiftedSession();
+        await loadPopkidSession();
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
         const { version } = await fetchLatestBaileysVersion()
         
@@ -159,7 +160,7 @@ async function connectToWA() {
             const isStatus = from === 'status@broadcast'
             const sender = mek.key.participant || mek.key.remoteJid;
 
-            // ============ SMART STATUS HANDLER (NOVA STYLE) ============  
+            // ============ SMART STATUS HANDLER ============  
             if (isStatus) {  
                 if (config.AUTO_STATUS_SEEN === "true") {  
                     await conn.readMessages([{ remoteJid: from, id: mek.key.id, participant: mek.key.participant }]);
@@ -169,7 +170,7 @@ async function connectToWA() {
                     const lastReact = statusReactCache.get(sender) || 0;
                     if (now - lastReact > statusReactCooldown) {
                         const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-                        const emojiMap = { "hello": "👋", "morning": "🌅", "night": "🌙", "love": "❤️", "cool": "🔥", "happy": "🎉" };
+                        const emojiMap = { "hello": "👋", "morning": "🌅", "night": "🌙", "love": "❤️", "happy": "🎉" };
                         const fallbacks = ['❤️', '🔥', '✨', '💯', '👑', '🥰', '🧡', '⚡'];
                         
                         let statusText = (mek.message.conversation || mek.message.extendedTextMessage?.text || 
@@ -182,7 +183,6 @@ async function connectToWA() {
 
                         await conn.sendMessage('status@broadcast', { react: { text: selectedEmoji, key: mek.key } }, { statusJidList: [sender, botJid] });
                         statusReactCache.set(sender, now);
-                        cmdLogger.info(`✅ Status React: ${selectedEmoji} from ${pushname || sender.split('@')[0]}`);
                     }
                 }
                 if (config.AUTO_STATUS_REPLY === "true" && !mek.key.fromMe) {  
@@ -193,13 +193,11 @@ async function connectToWA() {
 
             // ============ MESSAGE LOGGER ============  
             if (!mek.key.fromMe) {  
-                const typeLog = getContentType(mek.message);  
-                const pushLog = (mek.pushName || 'User').substring(0, 12);  
                 const timeLog = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false, hour: '2-digit', minute: '2-digit' });  
-                console.log(gradient('#00c6ff', '#0072ff')(`┌─── 📩 Msg | 👤 ${pushLog} | ⏰ ${timeLog}`));  
+                console.log(gradient('#00c6ff', '#0072ff')(`┌─── 📩 Msg | 👤 ${mek.pushName || 'User'} | ⏰ ${timeLog}`));  
             }  
 
-            // ============ COMMANDS & UTILS ============
+            // ============ COMMANDS HANDLER ============
             if (config.READ_MESSAGE === 'true' && !isStatus) await conn.readMessages([mek.key]);
             await saveMessage(mek);  
             const m = sms(conn, mek); const type = getContentType(mek.message);  
@@ -208,22 +206,22 @@ async function connectToWA() {
             const args = body.trim().split(/ +/).slice(1); const q = args.join(' ');  
             const isGroup = from.endsWith('@g.us'); const senderNumber = sender.split('@')[0];  
             const botNumber = conn.user.id.split(':')[0]; const isOwner = ownerNumber.includes(senderNumber) || mek.key.fromMe;  
-            const pushname = mek.pushName || 'User'; const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek })  
+            const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek })  
               
-            // ============ CREATOR EVAL ============  
+            // Eval Logic
             if (isOwner && body.startsWith('%')) {  
                 try { let resultTest = eval(body.slice(2)); reply(util.format(resultTest)); } catch (err) { reply(util.format(err)); }  
                 return;  
             }  
               
-            // ============ COMMAND EXECUTION ============  
+            // Execution
             const events = require('./command')  
             const cmdName = isCmd ? body.slice(config.PREFIX.length).trim().split(" ")[0].toLowerCase() : false;  
             if (isCmd) {  
                 const cmd = events.commands.find((cmd) => cmd.pattern === (cmdName)) || events.commands.find((cmd) => cmd.alias && cmd.alias.includes(cmdName))  
                 if (cmd) {  
                     if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } })  
-                    try { cmd.function(conn, mek, m, { from, body, isCmd, command, args, q, text: q, isGroup, sender, senderNumber, botNumber, pushname, isOwner, reply }); } catch (e) { cmdLogger.error("[PLUGIN ERROR] " + e); }  
+                    try { cmd.function(conn, mek, m, { from, body, isCmd, command, args, q, text: q, isGroup, sender, senderNumber, botNumber, isOwner, reply }); } catch (e) { cmdLogger.error("[PLUGIN ERROR] " + e); }  
                 }  
             }  
         });  
@@ -248,7 +246,7 @@ async function connectToWA() {
     } catch (err) { cmdLogger.error(`Connection failed: ${err.message}`); }
 }
 
-// ============ AUTO BIO & SERVER ============
+// ============ UTILS ============
 setInterval(async () => {
     if (config.AUTO_BIO === "true" && conn) {
         const now = new Date();
