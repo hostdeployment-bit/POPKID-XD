@@ -224,15 +224,9 @@ async function connectToWA() {
 
 // ============ AUTO BIO (Kenya Time) ============
 setInterval(async () => {
-    // FIXED: Changed updateProfileStatus check to avoid crashing the bot
-    if (config.AUTO_BIO === "true" && conn && conn.user) {
-        try {
-            const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
-            await conn.updateProfileStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`);
-        } catch (e) {
-            // Log the error without stopping the rest of the bot's status functions
-            cmdLogger.error(`Bio Update Fail: ${e.message}`);
-        }
+    if (config.AUTO_BIO === "true" && conn) {
+        const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
+        await conn.setStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`).catch(() => {});
     }
 }, 60000);
 
