@@ -15,7 +15,6 @@ async (conn, mek, m, { from, reply, sender }) => {
         const repoUrl = "https://github.com/popkidc/POPKID-XD";
         const apiUrl = "https://api.github.com/repos/popkidc/POPKID-XD";
         
-        // Fetching real-time data from GitHub
         const response = await axios.get(apiUrl);
         const data = response.data;
 
@@ -31,7 +30,6 @@ async (conn, mek, m, { from, reply, sender }) => {
 
 > *Created by Popkid Kenya* 👨‍💻`;
 
-        // Define the fakevCard (Popkid Ke)
         const fakevCard = {
             key: {
                 fromMe: false,
@@ -46,7 +44,6 @@ async (conn, mek, m, { from, reply, sender }) => {
             }
         };
 
-        // Context info for newsletter and link preview
         const newsletterContextInfo = {
             mentionedJid: [sender],
             forwardingScore: 999,
@@ -61,14 +58,14 @@ async (conn, mek, m, { from, reply, sender }) => {
                 body: "𝐒𝐂𝐑𝐈𝐏𝐓 𝐃𝐄𝐓𝐀𝐈𝐋𝐒 ⚡",
                 mediaType: 1,
                 thumbnailUrl: "https://files.catbox.moe/j9ia5c.png",
-                renderLargerThumbnail: true,
+                renderLargerThumbnail: false, // Changed to false to remove the "big" preview
                 sourceUrl: repoUrl
             }
         };
 
+        // Changed from 'image' to 'text' to remove the main attached image
         await conn.sendMessage(from, {
-            image: { url: `https://files.catbox.moe/j9ia5c.png` },
-            caption: repoMsg,
+            text: repoMsg, 
             contextInfo: newsletterContextInfo
         }, { quoted: fakevCard });
 
