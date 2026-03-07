@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Ultra-Performance Final Version)
- * Fixes: Command Lags, Status Viewing, and "Random Stops"
- * Features: Auto-Follow, Startup Image, Slim Box Logger
+ * 👑 POPKID-MD (Fixed & Ultra-Fast)
+ * Optimized by Gemini for Popkid Ke
+ * Fixed: Command Responsiveness, Status Lags, and Connection Stability
  */
 
 const {
@@ -12,22 +12,26 @@ const {
     fetchLatestBaileysVersion,
     Browsers,
     makeCacheableSignalKeyStore,
-    jidNormalizedUser
+    jidDecode,
+    downloadContentFromMessage
 } = require('@whiskeysockets/baileys')
 
 const fs = require('fs')
 const path = require('path')
-const P = require('pino')
-const qrcode = require('qrcode-terminal')
+const os = require('os')
 const zlib = require('zlib')
-const express = require("express")
-const gradient = require('gradient-string')
 const { promisify } = require('util')
-
+const P = require('pino')
 const config = require('./config')
-const { sms, getGroupAdmins } = require('./lib/functions')
+const qrcode = require('qrcode-terminal')
+const util = require('util')
+const { sms } = require('./lib')
+const FileType = require('file-type')
+const axios = require('axios')
+const gradient = require('gradient-string')
+const express = require("express")
 
-// ============ AESTHETIC LOGGER ============
+// ============ LOGGER & BANNER (Original Style) ============
 const logThemes = {
     info: ['#4facfe', '#00f2fe'],
     success: ['#00b09b', '#96c93d'],
@@ -54,148 +58,167 @@ const botBanner = `
 
 console.clear();
 cmdLogger.banner(botBanner);
-cmdLogger.info("Starting POPKID-MD High-Performance Engine... 🚀");
+cmdLogger.info("Starting POPKID-MD (Fast Mode)... 🚀");
 
+// ============ GLOBAL ANTI-CRASH ============
+process.on("uncaughtException", (err) => cmdLogger.error(`Uncaught: ${err.message}`));
+process.on("unhandledRejection", (reason) => cmdLogger.error(`Rejected: ${reason}`));
+
+const { getBuffer, getGroupAdmins, sleep } = require('./lib/functions')
+const { saveMessage } = require('./data')
+
+const ownerNumber = ['254732297194']
 const sessionDir = path.join(__dirname, 'sessions');
 
-async function connectToWA() {
+async function loadGiftedSession() {
     if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
-
-    // Faster Session Recovery
-    if (config.SESSION_ID && !fs.existsSync(path.join(sessionDir, 'creds.json'))) {
+    const credsPath = path.join(sessionDir, 'creds.json');
+    if (fs.existsSync(credsPath)) return true;
+    if (config.SESSION_ID && config.SESSION_ID.startsWith("POPKID~")) {
         try {
-            const sessData = config.SESSION_ID.replace("POPKID~", "");
-            const decompressed = await promisify(zlib.gunzip)(Buffer.from(sessData, 'base64'));
-            fs.writeFileSync(path.join(sessionDir, 'creds.json'), decompressed.toString());
-        } catch (e) { cmdLogger.error("Session Repair Failed"); }
+            const compressedBase64 = config.SESSION_ID.substring("POPKID~".length);
+            const compressedBuffer = Buffer.from(compressedBase64, 'base64');
+            const gunzip = promisify(zlib.gunzip);
+            const decompressedBuffer = await gunzip(compressedBuffer);
+            await fs.promises.writeFile(credsPath, decompressedBuffer.toString('utf-8'));
+            cmdLogger.success("Session Restored ✅");
+            return true;
+        } catch (error) { return false; }
     }
+    return false;
+}
 
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
-    const { version } = await fetchLatestBaileysVersion()
+const app = express()
+let conn
 
-    // --- SOCKET CONFIGURATION (TUNED FOR SPEED) ---
-    const conn = makeWASocket({
-        logger: P({ level: 'silent' }),
-        printQRInTerminal: false,
-        browser: Browsers.macOS("Desktop"),
-        auth: {
-            creds: state.creds,
-            // makeCacheableSignalKeyStore prevents the "lag" when encryption keys are processed
-            keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })) 
-        },
-        version,
-        generateHighQualityLinkPreview: false,
-        syncFullHistory: false, // Prevents "Stopping" while downloading old chats
-        maxMsgRetryCount: 3
-    })
+async function connectToWA() {
+    try {
+        await loadGiftedSession();
+        const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
+        const { version } = await fetchLatestBaileysVersion()
 
-    conn.ev.on('creds.update', saveCreds)
+        conn = makeWASocket({
+            logger: P({ level: 'silent' }),
+            printQRInTerminal: false,
+            browser: Browsers.macOS("Desktop"),
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })) // FIX: Speeds up encryption
+            },
+            version,
+            syncFullHistory: false // FIX: Prevents bot from hanging on startup
+        })
 
-    conn.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        if (qr) qrcode.generate(qr, { small: true });
-        
-        if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) {
-                cmdLogger.warning('Connection lost. Reconnecting instantly... 🔄');
-                setTimeout(connectToWA, 2000);
+        conn.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update
+            if (qr) qrcode.generate(qr, { small: true })
+            if (connection === 'close') {
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+                if (shouldReconnect) setTimeout(() => connectToWA(), 3000)
+            } else if (connection === 'open') {
+                cmdLogger.success('POPKID XD IS ONLINE 📲');
+                
+                // Startup Message
+                let up = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
+                await conn.sendMessage(conn.user.id, { image: { url: `https://files.catbox.moe/j9ia5c.png` }, caption: up });
+                
+                // Auto-Follow
+                try { await conn.newsletterFollow("120363423997837331@newsletter") } catch (e) {}
+                
+                // Load Plugins
+                const plugins = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
+                plugins.forEach(plugin => require("./plugins/" + plugin));
             }
-        } else if (connection === 'open') {
-            cmdLogger.success('POPKID-MD CONNECTED ✅');
-            
-            // --- NON-BLOCKING STARTUP TASKS ---
-            (async () => {
-                const upMsg = `╔══════════════════╗\n║ 🚀 POPKID-MD ONLINE\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
-                await conn.sendMessage(conn.user.id, {
-                    image: { url: `https://files.catbox.moe/j9ia5c.png` },
-                    caption: upMsg
-                }).catch(() => {});
+        })
 
-                const channelJid = "120363423997837331@newsletter";
-                await conn.newsletterFollow(channelJid).catch(() => {});
-            })();
+        conn.ev.on('creds.update', saveCreds)
 
-            const plugins = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
-            plugins.forEach(plugin => require("./plugins/" + plugin));
-            cmdLogger.success(`${plugins.length} Plugins Integrated.`);
-        }
-    })
+        conn.ev.on('messages.upsert', async (mek) => {
+            const msg = mek.messages[0]
+            if (!msg.message) return
+            const from = msg.key.remoteJid
+            const isStatus = from === 'status@broadcast'
+            const sender = msg.key.participant || msg.key.remoteJid;
 
-    conn.ev.on('messages.upsert', async (mek) => {
-        const m = mek.messages[0];
-        if (!m || !m.message) return;
-        
-        const from = m.key.remoteJid;
-        const isStatus = from === 'status@broadcast';
-        const sender = m.key.participant || m.key.remoteJid;
-
-        // ============ ⚡ RAPID STATUS HANDLER ============
-        if (isStatus) {
-            if (config.AUTO_STATUS_SEEN === "true") await conn.readMessages([m.key]);
-            if (config.AUTO_STATUS_REACT === "true" && !m.key.fromMe) {
-                const emojis = (config.STATUS_REACTIONS || '❤️,🔥,✨,⚡,💎,👑').split(',');
-                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)].trim();
-                // Send reaction without 'await' to keep the loop moving fast
-                conn.sendMessage(from, { react: { text: randomEmoji, key: m.key } }, { statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net'] }).catch(() => {});
+            // ============ ⚡ STATUS HANDLER (NON-BLOCKING) ============
+            if (isStatus) {
+                if (config.AUTO_STATUS_SEEN === "true") await conn.readMessages([msg.key]);
+                if (config.AUTO_STATUS_REACT === "true") {
+                    const emojis = (config.STATUS_REACTIONS || '❤️,🔥,⚡').split(',').map(e => e.trim());
+                    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                    conn.sendMessage(from, { react: { text: randomEmoji, key: msg.key } }, { statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net'] }).catch(() => {});
+                }
+                return;
             }
-            return;
-        }
 
-        // ============ 📩 AESTHETIC BOX LOGGER ============
-        if (!m.key.fromMe) {
-            const typeLog = getContentType(m.message);
-            const pushLog = (m.pushName || 'User').substring(0, 12);
-            const timeLog = new Date().toLocaleTimeString('en-KE', { hour12: false, hour: '2-digit', minute: '2-digit' });
-            const locLog = from.endsWith('@g.us') ? 'Group' : 'Private';
+            // ============ 📩 LOGGER (BOX STYLE) ============
+            if (!msg.key.fromMe) {
+                const typeLog = getContentType(msg.message);
+                const pushLog = (msg.pushName || 'User').substring(0, 12);
+                const timeLog = new Date().toLocaleTimeString('en-KE', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                const locLog = from.endsWith('@g.us') ? 'Group' : 'Private';
+                const boxColor = gradient('#00c6ff', '#0072ff');
+                console.log(boxColor(`┌─── ${timeLog} 👤 ${pushLog} 📍 ${locLog} ───┐`));
+            }
+
+            // ============ 🚀 COMMAND HANDLER ============
+            const m = sms(conn, msg)
+            const type = getContentType(msg.message)
+            const body = (type === 'conversation') ? msg.message.conversation : (type === 'extendedTextMessage') ? msg.message.extendedTextMessage.text : (type == 'imageMessage') && msg.message.imageMessage.caption ? msg.message.imageMessage.caption : (type == 'videoMessage') && msg.message.videoMessage.caption ? msg.message.videoMessage.caption : ''
             
-            let msgBody = (typeLog === 'conversation') ? m.message.conversation : (typeLog === 'extendedTextMessage') ? m.message.extendedTextMessage.text : `📦 ${typeLog}`;
-            const cleanMsg = (msgBody || '').replace(/\n/g, ' ').substring(0, 25);
-            const boxColor = gradient('#00c6ff', '#0072ff');
+            const isCmd = body.startsWith(config.PREFIX)
+            const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : ''
+            const args = body.trim().split(/ +/).slice(1)
+            const text = args.join(' ')
+            const isGroup = from.endsWith('@g.us')
+            const senderNumber = sender.split('@')[0]
+            const isOwner = ownerNumber.includes(senderNumber) || msg.key.fromMe
+            const pushname = msg.pushName || 'User'
 
-            console.log(boxColor(`┌──────────────────────────────────────────┐`));
-            console.log(
-                boxColor(`│ `) + gradient('#f7971e', '#ffd200')(`${timeLog}`) + 
-                boxColor(` 👤 `) + gradient('#ffffff', '#bdc3c7')(`${pushLog}`) + " ".repeat(Math.max(0, 12 - pushLog.length)) +
-                boxColor(` 📍 `) + gradient('#00b09b', '#96c93d')(`${locLog}`) + " ".repeat(Math.max(0, 10 - locLog.length)) + 
-                boxColor(`│`)
-            );
-            console.log(
-                boxColor(`│ `) + gradient('#ff00cc', '#3333ff')(`📩 Msg: ${cleanMsg}`) + 
-                " ".repeat(Math.max(0, 34 - cleanMsg.length)) + 
-                boxColor(`│`)
-            );
-            console.log(boxColor(`└──────────────────────────────────────────┘`));
-        }
+            // Mode Filters
+            if (!isOwner && config.MODE === "private") return
+            if (!isOwner && isGroup && config.MODE === "inbox") return
+            if (!isOwner && !isGroup && config.MODE === "groups") return
 
-        // ============ 🚀 OPTIMIZED COMMAND HANDLER ============
-        const body = (getContentType(m.message) === 'conversation') ? m.message.conversation : (getContentType(m.message) === 'extendedTextMessage') ? m.message.extendedTextMessage.text : (getContentType(m.message) == 'imageMessage') && m.message.imageMessage.caption ? m.message.imageMessage.caption : (getContentType(m.message) == 'videoMessage') && m.message.videoMessage.caption ? m.message.videoMessage.caption : '';
-        const isCmd = body.startsWith(config.PREFIX);
-        if (!isCmd) return;
+            // Command Execution
+            const events = require('./command')
+            if (isCmd) {
+                const cmd = events.commands.find((c) => c.pattern === command || (c.alias && c.alias.includes(command)))
+                if (cmd) {
+                    if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: msg.key } })
+                    try {
+                        // FIX: Added 'q' and 'reply' to context
+                        await cmd.function(conn, msg, m, { 
+                            from, body, isCmd, command, args, q: text, text, isGroup, 
+                            sender, senderNumber, pushname, isOwner, 
+                            reply: (teks) => conn.sendMessage(from, { text: teks }, { quoted: msg }) 
+                        });
+                    } catch (e) { cmdLogger.error(e) }
+                }
+            }
 
-        const command = body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase();
-        const args = body.trim().split(/ +/).slice(1);
-        const isOwner = config.OWNER_NUMBER?.includes(sender.split('@')[0]) || m.key.fromMe;
+            // Body Listeners
+            events.commands.map(async (command) => {
+                if (body && command.on === "body") {
+                    command.function(conn, msg, m, { from, body, isCmd, command, args, q: text, text, isGroup, sender, senderNumber, pushname, isOwner, reply: (teks) => conn.sendMessage(from, { text: teks }, { quoted: msg }) })
+                }
+            });
 
-        const events = require('./command');
-        const cmd = events.commands.find((c) => c.pattern === command || (c.alias && c.alias.includes(command)));
+        })
 
-        if (cmd) {
-            // Lazy-loading group data to prevent lag during chat processing
-            let groupMetadata = from.endsWith('@g.us') ? await conn.groupMetadata(from).catch(() => ({})) : {};
-            try {
-                await cmd.function(conn, m, sms(conn, m), {
-                    from, body, isCmd, command, args, isOwner, groupMetadata,
-                    reply: (teks) => conn.sendMessage(from, { text: teks }, { quoted: m })
-                });
-            } catch (e) { cmdLogger.error(e); }
-        }
-    });
+        // Core Utilities
+        conn.decodeJid = jid => {
+            if (!jid) return jid;
+            if (/:\d+@/gi.test(jid)) {
+                let decode = jidDecode(jid) || {};
+                return (decode.user && decode.server && decode.user + '@' + decode.server) || jid;
+            } else return jid;
+        };
+    } catch (err) { cmdLogger.error(err.message) }
 }
 
 // Keep Alive Server
-const app = express();
-app.get("/", (req, res) => res.send("POPKID-MD IS ACTIVE 🚀"));
+app.get("/", (req, res) => res.send("POPKID-MD ACTIVE ✅"));
 app.listen(process.env.PORT || 9090);
 
 connectToWA();
