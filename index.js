@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Fixed & Optimized Version)
+ * 👑 POPKID-MD (Ultra-Stable Version)
  * Creator: Popkid Ke
- * Fixes: conn.setStatus -> updateProfileStatus | Status React Stability
+ * Logic: Sequential Status Processing (No Skipping)
  */
 
 const fs = require('fs')
@@ -18,10 +18,6 @@ const FileType = require('file-type')
 const axios = require('axios')
 const gradient = require('gradient-string')
 const express = require("express")
-
-// ============ CACHE & COOLDOWN ============
-const statusReactCache = new Map();
-const statusReactCooldown = 3000; // Increased slightly for stability
 
 // ============ LOGGER CONFIGURATION ============
 const logThemes = {
@@ -61,10 +57,8 @@ const {
     Browsers,
     jidDecode,
     fetchLatestBaileysVersion,
-    delay // Added delay to prevent 'not-acceptable' errors
+    delay 
 } = require('@whiskeysockets/baileys')
-
-const { saveMessage } = require('./data')
 
 //=================== SESSION LOADER ============================
 const sessionDir = path.join(__dirname, 'sessions');
@@ -115,20 +109,14 @@ async function connectToWA() {
             if (connection === 'open') {
                 cmdLogger.success('POPKID-MD IS ONLINE 📲');
                 
-                // 1. Newsletter Auto-Follow
                 const channelJid = "120363423997837331@newsletter";
                 try { await conn.newsletterFollow(channelJid); } catch (e) {}
 
-                // 2. Load Plugins
                 const plugins = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
                 plugins.forEach(p => require("./plugins/" + p));
 
-                // 3. Connection Success Message
-                let connectMsg = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n║ 🕒 TIME: ${new Date().toLocaleTimeString()}\n╚══════════════════╝`;
-                await conn.sendMessage(conn.user.id, {
-                    image: { url: config.ALIVE_IMG },
-                    caption: connectMsg
-                });
+                let connectMsg = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n╚══════════════════╝`;
+                await conn.sendMessage(conn.user.id, { image: { url: config.ALIVE_IMG }, caption: connectMsg });
             }
             
             if (connection === 'close') {
@@ -147,44 +135,39 @@ async function connectToWA() {
             const from = mek.key.remoteJid
             const sender = mek.key.participant || mek.key.remoteJid;
 
-            // ============ ✅ FIXED STATUS HANDLER ============
+            // ============ ✅ FIXED STATUS HANDLER (NO SKIPPING) ============
             if (from === 'status@broadcast') {
-                if (config.AUTO_STATUS_SEEN === "true") await conn.readMessages([mek.key]);
+                // 1. Mark as Seen immediately
+                if (config.AUTO_STATUS_SEEN === "true") {
+                    await conn.readMessages([mek.key]);
+                }
                 
+                // 2. Optimized Reaction (Queue Logic)
                 if (config.AUTO_STATUS_REACT === "true") {
-                    const now = Date.now()
-                    // Use Cooldown to prevent spam and account bans
-                    if (now - (statusReactCache.get(sender) || 0) > statusReactCooldown) {
-                        await delay(1000); // Small delay to prevent 'not-acceptable' error
-                        const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-                        
-                        // Smart Emoji Map
-                        const emojiMap = { 
-                            "love": ["❤️", "💖", "🥰"], "fire": ["🔥", "⚡"], 
-                            "happy": ["😊", "🎉"], "sad": ["😢", "💔"],
-                            "work": ["💼", "💻"], "food": ["🍕", "🍔"] 
-                        };
-                        const fallback = config.STATUS_REACTIONS.split(',');
-                        let statusText = (mek.message.conversation || mek.message.extendedTextMessage?.text || mek.message.imageMessage?.caption || "").toLowerCase();
-                        let selectedEmoji = fallback[Math.floor(Math.random() * fallback.length)];
-                        
-                        for (let key in emojiMap) {
-                            if (statusText.includes(key)) { 
-                                selectedEmoji = emojiMap[key][Math.floor(Math.random() * emojiMap[key].length)]; 
-                                break; 
-                            }
+                    // Small delay ensures we don't spam the server (prevents 'not-acceptable')
+                    await delay(1500); 
+                    
+                    const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+                    const fallback = config.STATUS_REACTIONS.split(',');
+                    const emojiMap = { "love": ["❤️", "💖"], "fire": ["🔥", "⚡"], "happy": ["😊", "🎉"] };
+                    
+                    let statusText = (mek.message.conversation || mek.message.extendedTextMessage?.text || mek.message.imageMessage?.caption || "").toLowerCase();
+                    let selectedEmoji = fallback[Math.floor(Math.random() * fallback.length)];
+                    
+                    for (let key in emojiMap) {
+                        if (statusText.includes(key)) { 
+                            selectedEmoji = emojiMap[key][Math.floor(Math.random() * emojiMap[key].length)]; 
+                            break; 
                         }
+                    }
 
-                        try {
-                            await conn.sendMessage('status@broadcast', {
-                                react: { text: selectedEmoji, key: mek.key }
-                            }, { statusJidList: [sender, botJid] });
-                            
-                            statusReactCache.set(sender, now);
-                            cmdLogger.success(`Reacted to Status: ${sender.split('@')[0]}`);
-                        } catch (e) {
-                            cmdLogger.error(`Status React Failed: ${e.message}`);
-                        }
+                    try {
+                        await conn.sendMessage('status@broadcast', {
+                            react: { text: selectedEmoji, key: mek.key }
+                        }, { statusJidList: [sender, botJid] });
+                        cmdLogger.success(`Reacted to: ${sender.split('@')[0]}`);
+                    } catch (err) {
+                        cmdLogger.error(`React Failed: ${err.message}`);
                     }
                 }
                 
@@ -204,23 +187,18 @@ async function connectToWA() {
             
             if (config.READ_MESSAGE === 'true' && from !== 'status@broadcast') await conn.readMessages([mek.key]);
             
-            // Eval for Owner (%)
             if (isOwner && body.startsWith('%')) {
                 try { conn.sendMessage(from, { text: util.format(eval(body.slice(2))) }, { quoted: mek }); } catch (e) { conn.sendMessage(from, { text: util.format(e) }, { quoted: mek }); }
                 return;
             }
 
-            // Command Handling
             const events = require('./command')
             if (isCmd) {
                 const cmd = events.commands.find(c => c.pattern === command || (c.alias && c.alias.includes(command)))
                 if (cmd) {
                     if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } })
                     try {
-                        cmd.function(conn, mek, m, { 
-                            from, body, isCmd, command, 
-                            isOwner, reply: (t) => conn.sendMessage(from, { text: t }, { quoted: mek }) 
-                        });
+                        cmd.function(conn, mek, m, { from, body, isCmd, command, isOwner, reply: (t) => conn.sendMessage(from, { text: t }, { quoted: mek }) });
                     } catch (err) { cmdLogger.error(`Plugin Error: ${err}`); }
                 }
             }
@@ -229,17 +207,14 @@ async function connectToWA() {
     } catch (err) { cmdLogger.error(`Fail: ${err.message}`); }
 }
 
-// ============ AUTO BIO (Kenya Time) ============
+// ============ FIXED AUTO BIO ============
 setInterval(async () => {
     if (config.AUTO_BIO === "true" && conn) {
         const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
-        // FIXED: updateProfileStatus instead of setStatus
+        // Corrected method name for modern Baileys
         await conn.updateProfileStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`).catch(() => {});
     }
 }, 60000);
-
-// Simple Cache Clear to prevent Memory Leak
-setInterval(() => statusReactCache.clear(), 1000 * 60 * 60); // Clear every hour
 
 app.get("/", (req, res) => res.send("POPKID-MD ACTIVE ✅"));
 app.listen(process.env.PORT || 9090);
