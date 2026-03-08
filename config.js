@@ -7,21 +7,17 @@ function convertToBool(text, fault = 'true') {
 
 module.exports = {
     // ==========================================
-    // 🔑 SESSION & AUTH (Fixed Prefix)
+    // 🔑 SESSION & AUTH
     // ==========================================
-    // Hakikisha SESSION_ID yako inaanza na POPKID~
-    SESSION_ID: process.env.SESSION_ID || "POPKID~HcURgQQT#el1w53_DkYDDW13cEvqw0q80vHfOfnyZO_cyAL0mAUU",
+    SESSION_ID: process.env.SESSION_ID || "",
     
     // ==========================================
-    // 🚀 STATUS SETTINGS (Nova-Style Optimized)
+    // 🚀 STATUS SETTINGS (Optimized for Speed)
     // ==========================================
     AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN || "true",
     AUTO_STATUS_REACT: process.env.AUTO_STATUS_REACT || "true",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "false",
     AUTO_STATUS_MSG: process.env.AUTO_STATUS_MSG || "*𝐏𝐎𝐏𝐊𝐈𝐃 𝐌𝐃 𝐕𝐈𝐄𝐖𝐄𝐃✅*",
-    
-    // Hizi emoji zinatumika kama fallback kwenye smart react
-    STATUS_REACTIONS: process.env.STATUS_REACTIONS || "❤️,✨,🔥,💯,👑,🥰,😇,🧡",
     CUSTOM_STATUS_EMOJIS: process.env.CUSTOM_STATUS_EMOJIS || "❤️,✨,🔥,💯,👑,🥰,😇,🧡",
 
     // ==========================================
