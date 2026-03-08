@@ -9,24 +9,23 @@ module.exports = {
     // ==========================================
     // 🔑 SESSION & AUTH
     // ==========================================
-    SESSION_ID: process.env.SESSION_ID || "",
+    SESSION_ID: process.env.SESSION_ID || "POPKID;;;HcURgQQT#el1w53_DkYDDW13cEvqw0q80vHfOfnyZO_cyAL0mAUU",
     
     // ==========================================
-    // 🚀 STATUS SETTINGS (Fixed for Index.js)
+    // 🚀 STATUS SETTINGS (Optimized for Speed)
     // ==========================================
     AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN || "true",
     AUTO_STATUS_REACT: process.env.AUTO_STATUS_REACT || "true",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "false",
     AUTO_STATUS_MSG: process.env.AUTO_STATUS_MSG || "*𝐏𝐎𝐏𝐊𝐈𝐃 𝐌𝐃 𝐕𝐈𝐄𝐖𝐄𝐃✅*",
-    // Changed key name to match index.js requirement:
-    STATUS_REACTIONS: process.env.STATUS_REACTIONS || "❤️,✨,🔥,💯,👑,🥰,😇,🧡,🇰🇪", 
+    CUSTOM_STATUS_EMOJIS: process.env.CUSTOM_STATUS_EMOJIS || "❤️,✨,🔥,💯,👑,🥰,😇,🧡",
 
     // ==========================================
     // 🛡️ ANTI-DELETE & PRIVACY
     // ==========================================
     ANTI_DELETE: process.env.ANTI_DELETE || "false",
     ANTI_DELETE_DM: process.env.ANTI_DELETE_DM || "false",
-    ANTI_DEL_PATH: process.env.ANTI_DEL_PATH || "log",
+    ANTI_DEL_PATH: process.env.ANTI_DEL_PATH || "inbox",
     ANTI_CALL: process.env.ANTI_CALL || "false",
     ANTI_VV: process.env.ANTI_VV || "true",
     ALWAYS_ONLINE: process.env.ALWAYS_ONLINE || "true",
@@ -74,8 +73,8 @@ module.exports = {
     ANTI_LINK: process.env.ANTI_LINK || "false",
     ANTI_LINK_KICK: process.env.ANTI_LINK_KICK || "false",
     DELETE_LINKS: process.env.DELETE_LINKS || "true",
-    LINK_WHITELIST: process.env.LINK_WHITELIST || "youtube.com,github.com",
-    LINK_WARN_LIMIT: process.env.LINK_WARN_LIMIT || 3,
+    LINK_WHITELIST: "youtube.com,github.com",
+    LINK_WARN_LIMIT: 3,
     ANTI_LINK_WARN_MSG: process.env.ANTI_LINK_WARN_MSG || "⚠️ Links are not allowed in this group.",
     ANTI_LINK_KICK_MSG: process.env.ANTI_LINK_KICK_MSG || "🚪 You have been removed for sending links.",
 };
