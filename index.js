@@ -1,7 +1,7 @@
 /**
- * 👑 POPKID-MD (Ultimate Ready-to-Use Version)
+ * 👑 POPKID-MD (Final Stable Version - Full Fix)
  * Creator: Popkid Ke (Kenya)
- * Logic: Status React, Smart Emojis, Bio, & Connection Message
+ * Fix: Multi-Contact Status Viewing & Smart React
  */
 
 const fs = require('fs');
@@ -28,7 +28,6 @@ const {
 
 // ============ CACHE & SETTINGS ============
 const statusReactCache = new Map();
-const statusReactCooldown = 5000; 
 
 const cmdLogger = {
     info: (msg) => console.log(gradient('#4facfe', '#00f2fe')(`ℹ ${msg}`)),
@@ -90,17 +89,14 @@ async function connectToWA() {
         if (connection === 'open') {
             cmdLogger.success('POPKID-MD IS ONLINE 🇰🇪');
 
-            // 1. Newsletter Auto-Follow
             const channelJid = "120363423997837331@newsletter";
             try { await conn.newsletterFollow(channelJid); } catch (e) {}
 
-            // 2. Load Plugins
             if (fs.existsSync("./plugins/")) {
                 const plugins = fs.readdirSync("./plugins/").filter(p => p.endsWith(".js"));
                 plugins.forEach(p => { try { require("./plugins/" + p); } catch (e) {} });
             }
 
-            // 3. Connection Message
             let connectMsg = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n║ 🕒 TIME: ${new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}\n╚══════════════════╝`;
             await conn.sendMessage(conn.user.id, {
                 image: { url: config.ALIVE_IMG },
@@ -111,10 +107,10 @@ async function connectToWA() {
         if (connection === 'close') {
             const reason = lastDisconnect?.error?.output?.statusCode;
             if (reason !== DisconnectReason.loggedOut) {
-                cmdLogger.info("Reconnecting in 5s...");
+                cmdLogger.info("Connection lost. Reconnecting in 5s...");
                 setTimeout(() => connectToWA(), 5000);
             } else {
-                cmdLogger.error("Logged Out. Clear session and scan again.");
+                cmdLogger.error("Logged Out. Please scan again.");
             }
         }
     });
@@ -130,15 +126,21 @@ async function connectToWA() {
         const from = mek.key.remoteJid;
         const sender = mek.key.participant || mek.key.remoteJid;
 
-        // --- STATUS HANDLER (WITH SMART EMOJIS) ---
+        // --- FIXED STATUS HANDLER (VIEWS ALL CONTACTS) ---
         if (from === 'status@broadcast') {
-            if (config.AUTO_STATUS_SEEN === "true") await conn.readMessages([mek.key]);
+            const contactName = mek.pushName || sender.split('@')[0];
+
+            // 1. Auto View Every Status
+            if (config.AUTO_STATUS_SEEN === "true") {
+                await conn.readMessages([mek.key]);
+            }
             
+            // 2. Auto React with Smart Logic
             if (config.AUTO_STATUS_REACT === "true") {
-                const now = Date.now();
-                if (now - (statusReactCache.get(sender) || 0) > statusReactCooldown) {
-                    
-                    // SMART EMOJI LOGIC
+                // Unique key per status slide to avoid skipping contacts
+                const statusKey = `${sender}_${mek.key.id}`;
+                
+                if (!statusReactCache.has(statusKey)) {
                     const emojiMap = { 
                         "love": "❤️", "🥰": "💖", "fire": "🔥", "lit": "⚡", 
                         "happy": "😊", "sad": "😢", "rip": "💔", "work": "💻", 
@@ -146,8 +148,8 @@ async function connectToWA() {
                     };
 
                     let statusText = (mek.message.conversation || mek.message.extendedTextMessage?.text || mek.message.imageMessage?.caption || "").toLowerCase();
-                    const fallbackReactions = config.STATUS_REACTIONS.split(',');
-                    let selectedEmoji = fallbackReactions[Math.floor(Math.random() * fallbackReactions.length)];
+                    const reactions = config.STATUS_REACTIONS.split(',');
+                    let selectedEmoji = reactions[Math.floor(Math.random() * reactions.length)];
 
                     for (let key in emojiMap) {
                         if (statusText.includes(key)) { 
@@ -158,10 +160,10 @@ async function connectToWA() {
 
                     await conn.sendMessage('status@broadcast', {
                         react: { text: selectedEmoji, key: mek.key }
-                    }, { statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net'] });
+                    }, { statusJidList: [sender] });
 
-                    statusReactCache.set(sender, now);
-                    cmdLogger.success(`Reacted [${selectedEmoji}] to Status`);
+                    statusReactCache.set(statusKey, Date.now());
+                    cmdLogger.success(`Viewed & Reacted [${selectedEmoji}] to: ${contactName}`);
                 }
             }
             return;
@@ -181,26 +183,32 @@ async function connectToWA() {
             if (cmd) {
                 if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
                 try {
-                    cmd.function(conn, mek, m, { from, body, isCmd, command, isOwner, reply: (t) => conn.sendMessage(from, { text: t }, { quoted: mek }) });
+                    cmd.function(conn, mek, m, { 
+                        from, body, isCmd, command, isOwner, 
+                        reply: (t) => conn.sendMessage(from, { text: t }, { quoted: mek }) 
+                    });
                 } catch (e) { cmdLogger.error(`Plugin Error: ${e.message}`); }
             }
         }
     });
 }
 
-// ============ AUTO TASKS ============
+// ============ BACKGROUND MAINTENANCE ============
 setInterval(async () => {
-    // 1. Kenya Bio Update
+    // 1. Kenya Bio (Nairobi Time)
     if (config.AUTO_BIO === "true" && conn?.user) {
         const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
         await conn.setStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`).catch(() => {});
     }
-    // 2. RAM Management
-    if (statusReactCache.size > 150) statusReactCache.clear();
+    // 2. Clear RAM Cache (Prevents slowdown)
+    if (statusReactCache.size > 500) {
+        statusReactCache.clear();
+        cmdLogger.info("Memory Cleanup: Cache cleared.");
+    }
 }, 60000);
 
-// ============ START SERVER ============
-app.get("/", (req, res) => res.send("POPKID-MD IS RUNNING 🟢"));
+// ============ WEB SERVER ============
+app.get("/", (req, res) => res.send("POPKID-MD ACTIVE 🟢"));
 app.listen(process.env.PORT || 9090);
 
 setTimeout(() => connectToWA(), 3000);
