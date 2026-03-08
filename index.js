@@ -79,11 +79,7 @@ async function connectToWA() {
         browser: Browsers.macOS("Desktop"),
         auth: state,
         version,
-
-        // FIX FOR STATUS VISIBILITY
-        syncFullHistory: true,
-        markOnlineOnConnect: true,
-        emitOwnEvents: true
+        syncFullHistory: false
     });
 
     // ============ CONNECTION EVENTS ============
@@ -105,15 +101,7 @@ async function connectToWA() {
             }
 
             // 3. Connection Message
-            let connectMsg = `╔══════════════════╗
-║ 🚀 POPKID-MD CONNECTED
-╠══════════════════╣
-║ 👤 USER: ${conn.user.name || 'Bot'}
-║ 🔑 PREFIX: ${config.PREFIX}
-║ 👨‍💻 DEV: Popkid Kenya
-║ 🕒 TIME: ${new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
-╚══════════════════╝`;
-
+            let connectMsg = `╔══════════════════╗\n║ 🚀 POPKID-MD CONNECTED\n╠══════════════════╣\n║ 👤 USER: ${conn.user.name || 'Bot'}\n║ 🔑 PREFIX: ${config.PREFIX}\n║ 👨‍💻 DEV: Popkid Kenya\n║ 🕒 TIME: ${new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}\n╚══════════════════╝`;
             await conn.sendMessage(conn.user.id, {
                 image: { url: config.ALIVE_IMG },
                 caption: connectMsg
@@ -137,41 +125,27 @@ async function connectToWA() {
     conn.ev.on('messages.upsert', async (mek) => {
         mek = mek.messages[0];
         if (!mek.message) return;
-
-        mek.message = (getContentType(mek.message) === 'ephemeralMessage')
-        ? mek.message.ephemeralMessage.message
-        : mek.message;
+        mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message;
 
         const from = mek.key.remoteJid;
         const sender = mek.key.participant || mek.key.remoteJid;
 
         // --- STATUS HANDLER (WITH SMART EMOJIS) ---
         if (from === 'status@broadcast') {
-
-            if (config.AUTO_STATUS_SEEN === "true") {
-                await conn.readMessages([mek.key]);
-                await conn.sendPresenceUpdate("available");
-            }
+            if (config.AUTO_STATUS_SEEN === "true") await conn.readMessages([mek.key]);
             
             if (config.AUTO_STATUS_REACT === "true") {
-
                 const now = Date.now();
-
                 if (now - (statusReactCache.get(sender) || 0) > statusReactCooldown) {
                     
+                    // SMART EMOJI LOGIC
                     const emojiMap = { 
                         "love": "❤️", "🥰": "💖", "fire": "🔥", "lit": "⚡", 
                         "happy": "😊", "sad": "😢", "rip": "💔", "work": "💻", 
                         "gym": "💪", "food": "🍕", "nairobi": "🇰🇪", "hustle": "💯" 
                     };
 
-                    let statusText = (
-                        mek.message.conversation ||
-                        mek.message.extendedTextMessage?.text ||
-                        mek.message.imageMessage?.caption ||
-                        ""
-                    ).toLowerCase();
-
+                    let statusText = (mek.message.conversation || mek.message.extendedTextMessage?.text || mek.message.imageMessage?.caption || "").toLowerCase();
                     const fallbackReactions = config.STATUS_REACTIONS.split(',');
                     let selectedEmoji = fallbackReactions[Math.floor(Math.random() * fallbackReactions.length)];
 
@@ -184,9 +158,7 @@ async function connectToWA() {
 
                     await conn.sendMessage('status@broadcast', {
                         react: { text: selectedEmoji, key: mek.key }
-                    }, { 
-                        statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net']
-                    });
+                    }, { statusJidList: [sender, conn.user.id.split(':')[0] + '@s.whatsapp.net'] });
 
                     statusReactCache.set(sender, now);
                     cmdLogger.success(`Reacted [${selectedEmoji}] to Status`);
@@ -198,13 +170,7 @@ async function connectToWA() {
         // --- COMMAND HANDLER ---
         const m = sms(conn, mek);
         const type = getContentType(mek.message);
-
-        const body =
-            (type === 'conversation') ? mek.message.conversation :
-            (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text :
-            (type === 'imageMessage' && mek.message.imageMessage.caption) ? mek.message.imageMessage.caption :
-            (type === 'videoMessage' && mek.message.videoMessage.caption) ? mek.message.videoMessage.caption : '';
-
+        const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : '';
         const isCmd = body.startsWith(config.PREFIX);
         const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : '';
         const isOwner = sender.split('@')[0] === config.OWNER_NUMBER || mek.key.fromMe;
@@ -212,22 +178,11 @@ async function connectToWA() {
         if (isCmd) {
             const events = require('./command');
             const cmd = events.commands.find(c => c.pattern === command || (c.alias && c.alias.includes(command)));
-
             if (cmd) {
                 if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
-
                 try {
-                    cmd.function(conn, mek, m, {
-                        from,
-                        body,
-                        isCmd,
-                        command,
-                        isOwner,
-                        reply: (t) => conn.sendMessage(from, { text: t }, { quoted: mek })
-                    });
-                } catch (e) {
-                    cmdLogger.error(`Plugin Error: ${e.message}`);
-                }
+                    cmd.function(conn, mek, m, { from, body, isCmd, command, isOwner, reply: (t) => conn.sendMessage(from, { text: t }, { quoted: mek }) });
+                } catch (e) { cmdLogger.error(`Plugin Error: ${e.message}`); }
             }
         }
     });
@@ -235,18 +190,13 @@ async function connectToWA() {
 
 // ============ AUTO TASKS ============
 setInterval(async () => {
-
+    // 1. Kenya Bio Update
     if (config.AUTO_BIO === "true" && conn?.user) {
-        const time = new Date().toLocaleTimeString('en-KE', {
-            timeZone: 'Africa/Nairobi',
-            hour12: false
-        });
-
+        const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
         await conn.setStatus(`${config.BOT_NAME} ⚡ | ⏰ ${time}`).catch(() => {});
     }
-
+    // 2. RAM Management
     if (statusReactCache.size > 150) statusReactCache.clear();
-
 }, 60000);
 
 // ============ START SERVER ============
