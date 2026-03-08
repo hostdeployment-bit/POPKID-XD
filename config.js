@@ -12,13 +12,14 @@ module.exports = {
     SESSION_ID: process.env.SESSION_ID || "",
     
     // ==========================================
-    // 🚀 STATUS SETTINGS (Optimized for Speed)
+    // 🚀 STATUS SETTINGS (Fixed for Index.js)
     // ==========================================
     AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN || "true",
     AUTO_STATUS_REACT: process.env.AUTO_STATUS_REACT || "true",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "false",
     AUTO_STATUS_MSG: process.env.AUTO_STATUS_MSG || "*𝐏𝐎𝐏𝐊𝐈𝐃 𝐌𝐃 𝐕𝐈𝐄𝐖𝐄𝐃✅*",
-    CUSTOM_STATUS_EMOJIS: process.env.CUSTOM_STATUS_EMOJIS || "❤️,✨,🔥,💯,👑,🥰,😇,🧡",
+    // Changed key name to match index.js requirement:
+    STATUS_REACTIONS: process.env.STATUS_REACTIONS || "❤️,✨,🔥,💯,👑,🥰,😇,🧡,🇰🇪", 
 
     // ==========================================
     // 🛡️ ANTI-DELETE & PRIVACY
@@ -73,8 +74,8 @@ module.exports = {
     ANTI_LINK: process.env.ANTI_LINK || "false",
     ANTI_LINK_KICK: process.env.ANTI_LINK_KICK || "false",
     DELETE_LINKS: process.env.DELETE_LINKS || "true",
-    LINK_WHITELIST: "youtube.com,github.com",
-    LINK_WARN_LIMIT: 3,
+    LINK_WHITELIST: process.env.LINK_WHITELIST || "youtube.com,github.com",
+    LINK_WARN_LIMIT: process.env.LINK_WARN_LIMIT || 3,
     ANTI_LINK_WARN_MSG: process.env.ANTI_LINK_WARN_MSG || "⚠️ Links are not allowed in this group.",
     ANTI_LINK_KICK_MSG: process.env.ANTI_LINK_KICK_MSG || "🚪 You have been removed for sending links.",
 };
