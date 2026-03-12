@@ -4,12 +4,18 @@ const config = require('../config');
 
 cmd({
     pattern: "play2",
-    alias: ["song", "audio"],
+    alias: ["song2", "audio2"],
     desc: "Download and play audio from YouTube",
     category: "download",
     filename: __filename
-}, async (conn, m, mek, { from, q, reply, sender }) => {
+}, async (conn, m, mek, { from, q, reply, sender, body }) => {
     try {
+        // Fallback: If 'q' is empty, try to extract it manually from the message body
+        // This fixes the issue where the bot doesn't "see" the song name
+        if (!q && body.includes(" ")) {
+            q = body.split(" ").slice(1).join(" ");
+        }
+
         if (!q) return reply("❓ Please provide a song name or YouTube link.");
 
         // Initial Reaction
@@ -20,7 +26,8 @@ cmd({
         const response = await axios.get(apiUrl);
         const data = response.data;
 
-        if (!data.status || !data.result.metadata) {
+        // Check if the API returned a valid result
+        if (!data || !data.status || !data.result || !data.result.metadata) {
             return reply("❌ Song not found. Please try a different title.");
         }
 
@@ -37,9 +44,9 @@ cmd({
                    `🔗 *Link:* ${meta.url}\n\n` +
                    `*Processing your audio... Please wait.* ⚡`;
 
-        // Send Metadata with Thumbnail (Newsletter Style)
+        // Send Metadata with Thumbnail
         await conn.sendMessage(from, {
-            image: { url: meta.thumbnail },
+            image: { url: meta.thumbnail || meta.image },
             caption: desc,
             contextInfo: {
                 mentionedJid: [sender],
@@ -53,7 +60,7 @@ cmd({
             }
         }, { quoted: mek });
 
-        // Check if download URL is available
+        // Check for download URL
         if (downloadData && downloadData.url) {
             await conn.sendMessage(from, { 
                 audio: { url: downloadData.url }, 
@@ -63,12 +70,11 @@ cmd({
             
             await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
         } else {
-            // Handle the "Converting error" or missing link
-            return reply(`❌ *Download Error:* The server is currently unable to convert this audio. Link: ${meta.url}`);
+            return reply(`❌ *Download Error:* The API could not provide a download link for this song.`);
         }
 
     } catch (err) {
-        console.error("PLAY CMD ERROR:", err);
+        console.error("PLAY2 ERROR:", err);
         reply("❌ *An error occurred while fetching the audio.*");
     }
 });
