@@ -1,26 +1,26 @@
 const config = require('../config');
 const { cmd, commands } = require('../command');
 const { runtime } = require('../lib/functions');
-const axios = require('axios');
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━//
-//          HELPERS
+//      iOS STYLE HELPERS
 //━━━━━━━━━━━━━━━━━━━━━━━━━━//
 
-const isEnabled = (val) =>
+const isEnabled = (val) => 
     val && val.toString().toLowerCase() === "true";
 
-const badge = (val) =>
-    isEnabled(val) ? "🟢 ON" : "🔴 OFF";
+// Custom iOS-style toggles
+const toggle = (val) => 
+    isEnabled(val) ? " ON  [🟢]" : " OFF [⚪]";
 
-const row = (key, value) =>
-    `│ ${key.padEnd(14)} : ${value}\n`;
+const row = (label, value) => 
+    `│  %- ${label.padEnd(15)} : ${value}\n`;
 
-const header = (title) =>
-`╭─〔 ${title} 〕─╮\n`;
+const sectionHeader = (title) => 
+    `╭───────────────╮\n│  📱 *${title}*\n├───────────────╯\n`;
 
-const footer =
-`╰────────────────╯\n`;
+const sectionFooter = 
+    `╰━━━━━━━━━━━━━━━╼\n`;
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━//
 //          COMMAND
@@ -28,105 +28,81 @@ const footer =
 
 cmd({
     pattern: "config",
-    alias: ["settings", "env"],
-    desc: "Show all bot configuration variables (Owner Only)",
+    alias: ["settings", "setup", "ios"],
+    desc: "iOS-themed Bot Configuration Menu",
     category: "system",
     react: "⚙️",
     filename: __filename
-}, async (conn, mek, m, { from, quoted, reply, isCreator }) => {
+}, async (conn, mek, m, { from, reply }) => {
 
     try {
+        // --- Header Section ---
+        let iosMenu = ` *${config.BOT_NAME}* Settings\n`;
+        iosMenu += `_v4.0.2 • System Update Ready_\n\n`;
 
-        if (!isCreator) {
-            return reply("🚫 *Owner Only Command!* You're not authorized to view bot configurations.");
-        }
+        // --- Profile Section ---
+        iosMenu += sectionHeader("SYSTEM PROFILE");
+        iosMenu += row("Owner", config.OWNER_NAME);
+        iosMenu += row("Version", "Gemini-3-Flash");
+        iosMenu += row("Uptime", runtime(process.uptime()));
+        iosMenu += row("Mode", config.MODE.toUpperCase());
+        iosMenu += sectionFooter;
 
-        let caption = `
-╔══════════════════════╗
-║ ⚙️ ${config.BOT_NAME} SYSTEM
-╚══════════════════════╝
-`;
+        // --- Connectivity ---
+        iosMenu += sectionHeader("CONNECTIVITY");
+        iosMenu += row("Public Mode", toggle(config.PUBLIC_MODE));
+        iosMenu += row("Always On", toggle(config.ALWAYS_ONLINE));
+        iosMenu += row("Read Status", toggle(config.READ_MESSAGE));
+        iosMenu += sectionFooter;
 
-        // BOT INFO
-        caption += header("🤖 BOT INFO");
-        caption += row("Name", config.BOT_NAME);
-        caption += row("Prefix", config.PREFIX);
-        caption += row("Owner", config.OWNER_NAME);
-        caption += row("Owner No", config.OWNER_NUMBER);
-        caption += row("Mode", config.MODE.toUpperCase());
-        caption += footer;
+        // --- Automation ---
+        iosMenu += sectionHeader("AUTOMATION");
+        iosMenu += row("Auto Reply", toggle(config.AUTO_REPLY));
+        iosMenu += row("Auto React", toggle(config.AUTO_REACT));
+        iosMenu += row("Auto Stick", toggle(config.AUTO_STICKER));
+        iosMenu += sectionFooter;
 
-        // CORE
-        caption += header("⚙️ CORE");
-        caption += row("Public", badge(config.PUBLIC_MODE));
-        caption += row("Always On", badge(config.ALWAYS_ONLINE));
-        caption += row("Read Msgs", badge(config.READ_MESSAGE));
-        caption += row("Read Cmds", badge(config.READ_CMD));
-        caption += footer;
+        // --- Privacy & Security ---
+        iosMenu += sectionHeader("PRIVACY & SECURITY");
+        iosMenu += row("Anti-Link", toggle(config.ANTI_LINK));
+        iosMenu += row("Anti-Bad", toggle(config.ANTI_BAD));
+        iosMenu += row("Anti-ViewOnce", toggle(config.ANTI_VV));
+        iosMenu += sectionFooter;
 
-        // AUTOMATION
-        caption += header("🔌 AUTOMATION");
-        caption += row("Auto Reply", badge(config.AUTO_REPLY));
-        caption += row("Auto React", badge(config.AUTO_REACT));
-        caption += row("Custom React", badge(config.CUSTOM_REACT));
-        caption += row("React Emojis", config.CUSTOM_REACT_EMOJIS);
-        caption += row("Auto Sticker", badge(config.AUTO_STICKER));
-        caption += footer;
+        // --- Status Updates ---
+        iosMenu += sectionHeader("STATUS UPDATES");
+        iosMenu += row("Auto View", toggle(config.AUTO_STATUS_SEEN));
+        iosMenu += row("Auto Like", toggle(config.AUTO_STATUS_REACT));
+        iosMenu += sectionFooter;
 
-        // STATUS
-        caption += header("📡 STATUS");
-        caption += row("Seen", badge(config.AUTO_STATUS_SEEN));
-        caption += row("Reply", badge(config.AUTO_STATUS_REPLY));
-        caption += row("React", badge(config.AUTO_STATUS_REACT));
-        caption += row("Message", config.AUTO_STATUS_MSG);
-        caption += footer;
-
-        // SECURITY
-        caption += header("🛡 SECURITY");
-        caption += row("Anti-Link", badge(config.ANTI_LINK));
-        caption += row("Anti-Bad", badge(config.ANTI_BAD));
-        caption += row("Anti-VV", badge(config.ANTI_VV));
-        caption += row("Del Links", badge(config.DELETE_LINKS));
-        caption += footer;
-
-        // MEDIA
-        caption += header("🎨 MEDIA");
-        caption += row("Alive Img", config.ALIVE_IMG);
-        caption += row("Menu Img", config.MENU_IMAGE_URL);
-        caption += row("Alive Msg", config.LIVE_MSG);
-        caption += row("Sticker", config.STICKER_NAME);
-        caption += footer;
-
-        // MISC
-        caption += header("⏳ MISC");
-        caption += row("Typing", badge(config.AUTO_TYPING));
-        caption += row("Recording", badge(config.AUTO_RECORDING));
-        caption += row("Anti-Del", config.ANTI_DEL_PATH);
-        caption += row("Dev No", config.DEV);
-        caption += footer;
-
-        caption += `
-╭─〔 📌 DESCRIPTION 〕─╮
-│ ${config.DESCRIPTION}
-╰────────────────╯
-`;
+        // --- Footer Notes ---
+        iosMenu += `\n*Description:* _${config.DESCRIPTION}_\n`;
+        iosMenu += `\n📌 _Tap to manage your device configuration_`;
 
         await conn.sendMessage(
             from,
             {
                 image: { url: config.MENU_IMAGE_URL },
-                caption: caption,
+                caption: iosMenu,
                 contextInfo: {
                     mentionedJid: [m.sender],
                     forwardingScore: 999,
-                    isForwarded: true
+                    isForwarded: true,
+                    externalAdReply: {
+                        title: "System Settings",
+                        body: `Connected as: ${config.BOT_NAME}`,
+                        mediaType: 1,
+                        thumbnailUrl: config.MENU_IMAGE_URL,
+                        sourceUrl: "https://github.com/Popkid-Official", // Custom link
+                        showAdAttribution: true
+                    }
                 }
             },
             { quoted: mek }
         );
 
     } catch (error) {
-        console.error("Config Command Error:", error);
-        reply(`❌ Error displaying config: ${error.message}`);
+        console.error("iOS Menu Error:", error);
+        reply(`⚠️ *System Error:* ${error.message}`);
     }
 });
