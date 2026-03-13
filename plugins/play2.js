@@ -11,61 +11,71 @@ cmd({
 }, async (conn, m, mek, { from, q, reply, sender, body }) => {
     try {
         if (!q && body.includes(" ")) q = body.split(" ").slice(1).join(" ");
-        if (!q) return reply("❓ Please provide a song name or link.");
+        if (!q) return reply(" *ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ sᴏɴɢ ɴᴀᴍᴇ ᴏʀ ʟɪɴᴋ.*");
 
-        await conn.sendMessage(from, { react: { text: "⏳", key: mek.key } });
+        await conn.sendMessage(from, { react: { text: "⚡", key: mek.key } });
 
-        // 1. Get Metadata (Thumbnail & Title) from Search
-        const searchUrl = `https://api.vreden.my.id/api/v1/download/play/audio?query=${encodeURIComponent(q)}`;
-        const searchRes = await axios.get(searchUrl);
-        
+        const iosvCard = {
+            key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
+            message: {
+                contactMessage: {
+                    displayName: " POPKID MUSIC",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Popkid Ke\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
+                }
+            }
+        };
+
+        const searchRes = await axios.get(`https://api.vreden.my.id/api/v1/download/play/audio?query=${encodeURIComponent(q)}`);
         if (!searchRes.data.status || !searchRes.data.result.metadata) {
-            await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
-            return reply("❌ Could not find the song.");
+            return reply("❌ *ꜱᴏɴɢ ɴᴏᴛ ꜰᴏᴜɴᴅ.*");
         }
 
         const meta = searchRes.data.result.metadata;
 
-        // 2. Send Metadata Message
+        // Cleanest iOS UI layout
+        const playCaption = `* ɴᴏᴡ ᴘʟᴀʏɪɴɢ* 🎶\n\n` +
+                            `*ᴛɪᴛʟᴇ:* ${meta.title}\n` +
+                            `*ᴜᴘʟᴏᴀᴅᴇʀ:* ${meta.author.name}\n` +
+                            `*ᴅᴜʀᴀᴛɪᴏɴ:* ${meta.timestamp}\n\n` +
+                            `> *ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ꜰʀᴏᴍ ᴇʟɪᴛᴇ ꜱᴇʀᴠᴇʀ...*`;
+
         await conn.sendMessage(from, {
             image: { url: meta.thumbnail || meta.image },
-            caption: `*POPKID-XMD PLAYER* 🎶\n\n📌 *Title:* ${meta.title}\n🕒 *Duration:* ${meta.timestamp}\n👤 *Channel:* ${meta.author.name}\n\n*Fetching your audio file...* ⚡`,
+            caption: playCaption,
             contextInfo: {
                 mentionedJid: [sender],
-                forwardingScore: 999,
+                forwardingScore: 1,
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
-                    newsletterName: config.OWNER_NAME || 'POPKID',
+                    newsletterName: "ᴘᴏᴘᴋɪᴅ ᴍᴜsɪᴄ",
                     serverMessageId: 1
+                },
+                externalAdReply: {
+                    title: " ᴘᴏᴘᴋɪᴅ ᴍᴇᴅɪᴀ ᴇɴɢɪɴᴇ",
+                    body: "ʀᴇᴀᴅʏ ꜰᴏʀ ᴅᴏᴡɴʟᴏᴀᴅ",
+                    mediaType: 1,
+                    renderLargerThumbnail: false,
+                    thumbnailUrl: meta.thumbnail || meta.image,
+                    sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
                 }
             }
-        }, { quoted: mek });
+        }, { quoted: iosvCard });
 
-        // 3. Get Download Link from the NEW Elite API
-        const eliteApiUrl = `https://eliteprotech-apis.zone.id/ytmp3?url=${encodeURIComponent(meta.url)}`;
-        const downloadRes = await axios.get(eliteApiUrl);
-
-        // Based on the response you provided: downloadRes.data.result.download
+        const downloadRes = await axios.get(`https://eliteprotech-apis.zone.id/ytmp3?url=${encodeURIComponent(meta.url)}`);
         const finalAudioUrl = downloadRes.data.result?.download;
 
         if (finalAudioUrl && finalAudioUrl.startsWith('http')) {
-            // 4. Send the Audio File
             await conn.sendMessage(from, { 
                 audio: { url: finalAudioUrl }, 
                 mimetype: 'audio/mpeg',
                 fileName: `${meta.title}.mp3`
             }, { quoted: mek });
-            
             await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
         } else {
-            await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
-            return reply("❌ *Server Busy:* The download link could not be generated at this time.");
+            reply("❌ *ᴇʀʀᴏʀ:* ᴜɴᴀʙʟᴇ ᴛᴏ ꜰᴇᴛᴄʜ ᴀᴜᴅɪᴏ.");
         }
-
     } catch (err) {
-        console.error("ELITE PLAY ERROR:", err);
-        await conn.sendMessage(from, { react: { text: "❌", key: mek.key } });
-        reply("❌ *Error:* Failed to fetch audio. Try again shortly.");
+        reply("❌ *ꜰᴀᴛᴀʟ ᴇʀʀᴏʀ.*");
     }
 });
