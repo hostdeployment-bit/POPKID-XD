@@ -15,10 +15,11 @@ cmd({
         const minutes = Math.floor((uptimeSeconds % 3600) / 60);
         const seconds = Math.floor(uptimeSeconds % 60);
 
-        const uptimeString = `🕒 *ᴜᴘᴛɪᴍᴇ:* ${hours}ʜ ${minutes}ᴍ ${seconds}s`;
+        // iOS Style Text Formatting
+        const uptimeString = `*ꜱʏꜱᴛᴇᴍ ʀᴜɴᴛɪᴍᴇ* ⏳\n\n*ᴜᴘᴛɪᴍᴇ:* ${hours}ʜ ${minutes}ᴍ ${seconds}ꜱ\n*ꜱᴛᴀᴛᴜꜱ:* Active 🟢`;
 
-        // Define the fakevCard (Popkid Ke)
-        const fakevCard = {
+        // iOS-style vCard (Sleek & Professional)
+        const iosvCard = {
             key: {
                 fromMe: false,
                 participant: "0@s.whatsapp.net",
@@ -26,28 +27,28 @@ cmd({
             },
             message: {
                 contactMessage: {
-                    displayName: "Popkid Ke",
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:popkid\nORG:popkid;\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
+                    displayName: " POPKID-XMD",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:POPKID\nTEL;type=CELL;type=VOICE;waid=254111385747:+254111385747\nEND:VCARD`
                 }
             }
         };
 
-        // Context info for newsletter and large clear image
-        const newsletterContextInfo = {
+        // iOS Newsletter Context (Clean, No Large Image)
+        const iosContext = {
             mentionedJid: [sender],
             forwardingScore: 999,
             isForwarded: true,
             forwardedNewsletterMessageInfo: {
                 newsletterJid: config.NEWSLETTER_JID || '120363423997837331@newsletter',
-                newsletterName: config.OWNER_NAME || 'POPKID',
+                newsletterName: "ᴘᴏᴘᴋɪᴅ-xᴍᴅ ɴᴇᴛᴡᴏʀᴋ",
                 serverMessageId: 1
             },
             externalAdReply: {
-                title: "POPKID XMD UPTIME",
-                body: "𝐒𝐘𝐒𝐓𝐄𝐌 𝐒𝐓𝐀𝐓𝐔𝐒 🟢",
+                title: " ᴘᴏᴘᴋɪᴅ ꜱʏꜱᴛᴇᴍꜱ",
+                body: "ᴍᴏɴɪᴛᴏʀɪɴɢ ʟɪᴠᴇ ꜱᴇꜱꜱɪᴏɴ...",
                 mediaType: 1,
-                thumbnailUrl: "https://files.catbox.moe/aapw1p.png", // Clear image URL
-                renderLargerThumbnail: true, // Makes it full and visible
+                renderLargerThumbnail: false, // Removes the big black image
+                thumbnailUrl: "https://files.catbox.moe/aapw1p.png", // Small icon style
                 sourceUrl: "https://whatsapp.com/channel/0029Vb70ySJHbFV91PNKuL3T"
             }
         };
@@ -55,11 +56,11 @@ cmd({
         // Send reaction
         await conn.sendMessage(from, { react: { text: "⏳", key: mek.key } });
 
-        // Send uptime with the fixed context and quoted vCard
+        // Send uptime with the minimalist context and quoted vCard
         await conn.sendMessage(from, { 
             text: uptimeString, 
-            contextInfo: newsletterContextInfo 
-        }, { quoted: fakevCard });
+            contextInfo: iosContext 
+        }, { quoted: iosvCard });
 
     } catch (e) {
         console.log(e);
