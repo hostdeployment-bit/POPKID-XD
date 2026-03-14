@@ -44,7 +44,7 @@ const BASE_URL = process.env.BASE_URL || "https://noobs-api.top";
 
 /* ========== PLAY (audio stream) ========== */
 cmd({
-  pattern: "play2",
+  pattern: "play",
   alias: ["p"],
   use: ".play <song name>",
   react: "🎵",
