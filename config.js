@@ -15,6 +15,7 @@ module.exports = {
     AUTO_STATUS_REACT: process.env.AUTO_STATUS_REACT || "true",
     AUTO_REACT_STATUS: process.env.AUTO_REACT_STATUS || "true", // Added for logic sync
     AUTO_STATUS_MSG: process.env.AUTO_STATUS_MSG || "*𝐏𝐎𝐏𝐊𝐈𝐃 𝐌𝐃 𝐕𝐈𝐄𝐖𝐄𝐃✅*",
+    ANTICALL: process.env.ANTICALL || "false", // Recommended to add this for the logic we added earlier
     CUSTOM_STATUS_EMOJIS: process.env.CUSTOM_STATUS_EMOJIS || "❤️,✨,🔥,💯,👑",
 
     // ====== Anti-Delete Config ======
