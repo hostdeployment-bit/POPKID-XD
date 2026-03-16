@@ -1,3 +1,7 @@
+This is the index.js of my bot dont change anything and dont ommit anything i need you to help me add anticall.js in my bot please 
+It should work with
+Lib and  plugins 
+
 /**
  * popkid WhatsApp Bot (Advanced Version)
  * Creator: popkid
