@@ -12,8 +12,8 @@ cmd({
 },
 async (conn, mek, m, { from, reply, sender }) => {
     try {
-        const repoUrl = "https://github.com/popkidc/POPKID-XD";
-        const apiUrl = "https://api.github.com/repos/popkidc/POPKID-XD";
+        const repoUrl = "https://github.com/popkidmain/NEON-MD";
+        const apiUrl = "https://api.github.com/repos/popkidmain/NEON-MD";
         
         // Fetching real-time data from GitHub
         const response = await axios.get(apiUrl);
